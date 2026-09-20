@@ -1,0 +1,328 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>typography — browser reference</title>
+<style>
+html,body{margin:0;padding:0;background:#080c14}
+/* gea layout.width INCLUDES padding (paddedWidth = width - padding), so every
+   box in the engine is border-box. Match it. */
+*{box-sizing:border-box}
+/* The engine panel is 410 DEVICE px and the web build bakes DPR 1.5, so the
+   engine lays out in a 410/1.5 = 273.33 CSS px viewport and paints at 1.5x.
+   Reproduce both halves so this reference lands on the same raster. */
+html{zoom:1.5}
+.typography-app{width:273.3333px !important;height:auto !important;overflow:visible !important}
+@font-face {
+  font-family: 'Inter';
+  src: url("./fonts/Inter-Regular.ttf");
+}
+
+@font-face {
+  font-family: 'Oswald';
+  src: url("./fonts/Oswald-Regular.ttf");
+}
+
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url("./fonts/BebasNeue-Regular.ttf");
+}
+
+@font-face {
+  font-family: 'Cossette Texte';
+  src: url("./fonts/CossetteTexte-Regular.ttf");
+}
+
+@font-face {
+  font-family: 'Literata';
+  src: url("./fonts/Literata-Regular.ttf");
+}
+
+.typography-app {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background-color: #080c14;
+  color: #f8fafc;
+  font-family: 'Inter';
+  font-size: 16px;
+  padding: 22px 22px 34px 22px;
+  overflow: scroll;
+  gap: 18px;
+}
+
+.bebas-neue-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bebas-neue-specimen-title {
+  font-family: 'Bebas Neue';
+  font-size: 32px;
+  color: #38bdf8;
+}
+
+.bebas-neue-specimen-copy-large {
+  font-family: 'Bebas Neue';
+  font-size: 24px;
+}
+
+.bebas-neue-specimen-copy-small {
+  font-family: 'Bebas Neue';
+  font-size: 21px;
+}
+
+.bebas-neue-specimen-sample {
+  font-family: 'Bebas Neue';
+  font-size: 44px;
+  color: #f8fafc;
+}
+
+.bebas-neue-specimen-pangram {
+  font-family: 'Bebas Neue';
+  font-size: 22px;
+  color: #bae6fd;
+}
+
+.cossette-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cossette-specimen-title {
+  font-family: 'Bebas Neue';
+  font-size: 32px;
+  color: #a7f3d0;
+}
+
+.cossette-specimen-copy-large {
+  font-family: 'Cossette Texte';
+  font-size: 18px;
+}
+
+.cossette-specimen-copy-small {
+  font-family: 'Cossette Texte';
+  font-size: 16px;
+}
+
+.cossette-specimen-sample {
+  font-family: 'Cossette Texte';
+  font-size: 30px;
+  color: #f8fafc;
+}
+
+.cossette-specimen-pangram {
+  font-family: 'Cossette Texte';
+  font-size: 17px;
+  color: #d1fae5;
+}
+
+.typography-heading-card {
+  display: flex;
+  flex-direction: column;
+  border-width: 1px;
+  border-color: #273244;
+  border-radius: 12px;
+  padding: 14px;
+  background-color: #101722;
+  gap: 8px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Inter';
+  margin-bottom: 6px;
+}
+
+h1 {
+  font-size: 32px;
+}
+
+h2 {
+  font-size: 28px;
+}
+
+h3 {
+  font-size: 24px;
+}
+
+h4 {
+  font-size: 20px;
+}
+
+h5 {
+  font-size: 18px;
+}
+
+h6 {
+  font-size: 16px;
+  margin-bottom: 0px;
+}
+
+.inter-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.inter-specimen-title {
+  font-family: 'Bebas Neue';
+  font-size: 32px;
+  color: #fbbf24;
+}
+
+.inter-specimen-emphasis {
+  color: #93c5fd;
+}
+
+.inter-specimen-sample {
+  font-family: 'Inter';
+  font-size: 28px;
+  color: #e5e7eb;
+}
+
+.inter-specimen-caps {
+  font-family: 'Inter';
+  font-size: 16px;
+  color: #9ca3af;
+}
+
+.typography-intro {
+  margin-bottom: 6px;
+}
+
+.typography-title {
+  font-family: 'Bebas Neue';
+  font-size: 54px;
+  color: #ffffff;
+}
+
+.typography-intro-copy {
+  margin-bottom: 0px;
+}
+
+.typography-token-div {
+  color: #64d2ff;
+}
+
+.typography-token-span {
+  color: #fbbf24;
+}
+
+.typography-token-p {
+  color: #a7f3d0;
+}
+
+.literata-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.literata-specimen-title {
+  font-family: 'Bebas Neue';
+  font-size: 32px;
+  color: #fcd34d;
+}
+
+.literata-specimen-copy-large {
+  font-family: 'Literata';
+  font-size: 18px;
+}
+
+.literata-specimen-copy-small {
+  font-family: 'Literata';
+  font-size: 16px;
+}
+
+.literata-specimen-sample {
+  font-family: 'Literata';
+  font-size: 30px;
+  color: #f8fafc;
+}
+
+.literata-specimen-pangram {
+  font-family: 'Literata';
+  font-size: 17px;
+  color: #fef3c7;
+}
+
+.mixed-composition {
+  display: flex;
+  flex-direction: column;
+  border-width: 1px;
+  border-color: #374151;
+  border-radius: 12px;
+  padding: 14px;
+  background-color: #111827;
+  gap: 8px;
+}
+.mixed-composition-title {
+  font-family: 'Bebas Neue';
+  margin-bottom: 4px;
+  color: #ffffff;
+}
+
+.mixed-composition-copy {
+  font-family: 'Cossette Texte';
+  font-size: 17px;
+}
+
+.mixed-composition-label {
+  font-family: 'Inter';
+  color: #64d2ff;
+}
+
+.mixed-composition-score {
+  font-family: 'Oswald';
+  color: #fbbf24;
+}
+
+.mixed-composition-loud {
+  font-family: 'Bebas Neue';
+  font-size: 22px;
+  color: #fb7185;
+}
+
+.mixed-composition-note {
+  font-family: 'Inter';
+  font-size: 15px;
+  margin-bottom: 0px;
+}
+
+.oswald-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oswald-specimen-title {
+  font-family: 'Bebas Neue';
+  font-size: 32px;
+  color: #fb7185;
+}
+
+.oswald-specimen-copy-large {
+  font-family: 'Oswald';
+  font-size: 19px;
+}
+
+.oswald-specimen-copy-small {
+  font-family: 'Oswald';
+  font-size: 17px;
+}
+
+.oswald-specimen-sample {
+  font-family: 'Oswald';
+  font-size: 32px;
+  color: #f8fafc;
+}
+
+.oswald-specimen-pangram {
+  font-family: 'Oswald';
+  font-size: 18px;
+  color: #cbd5e1;
+}
+
+</style>
+<div class="typography-app" momentum=""><div class="mixed-composition"><h2 class="mixed-composition-title">Mixed Composition</h2><p class="mixed-composition-copy">A paragraph can carry a <span class="mixed-composition-label">technical label</span>, a <span class="mixed-composition-score">score value</span>, and a <span class="mixed-composition-loud">LOUD MOMENT</span> without leaving the block.</p><p class="mixed-composition-note">Scroll to inspect wrapping, inheritance, heading defaults, and inline spans across all four bundled fonts.</p></div><div class="typography-intro"><span class="typography-title">Typography</span><p class="typography-intro-copy">A scrollable type specimen for the embedded renderer. The page uses <span class="typography-token-div">div</span>, <span class="typography-token-span">span</span>, <span class="typography-token-p">p</span> and headings as the authoring vocabulary.</p></div><div class="typography-heading-card"><h1>Heading One</h1><h2>Heading Two</h2><h3>Heading Three</h3><h4>Heading Four</h4><h5>Heading Five</h5><h6>Heading Six</h6></div><div class="inter-specimen"><span class="inter-specimen-title">Inter</span><p>Inter is the steady interface voice: compact, neutral, and readable at small sizes. It keeps status text, settings labels, and dense controls calm without becoming invisible.</p><p>The quick brown fox jumps over 13 lazy dogs while every pixel lands on the same baseline.<span class="inter-specimen-emphasis"> Inline emphasis</span> stays inside the paragraph flow.</p><span class="inter-specimen-sample">Aa Bb Cc 12345</span><span class="inter-specimen-caps">ABCDEFGHIJKLMNOPQRSTUVWXYZ</span></div><div class="oswald-specimen"><span class="oswald-specimen-title">Oswald</span><p class="oswald-specimen-copy-large">Oswald has a condensed rhythm that feels useful for game scores, compact headlines, and anything that needs a bit of vertical confidence on a small screen.</p><p class="oswald-specimen-copy-small">Score 0248. Round 07. Battery 92 percent. Wi-Fi ready. Touch targets aligned.</p><span class="oswald-specimen-sample">Aa Bb Cc 12345</span><span class="oswald-specimen-pangram">Sphinx of black quartz, judge my vow.</span></div><div class="bebas-neue-specimen"><span class="bebas-neue-specimen-title">Bebas Neue</span><p class="bebas-neue-specimen-copy-large">Bebas Neue is the poster voice: tall, bright, and direct. It works for app titles, big timers, scoreboards, and moments that should feel announced.</p><p class="bebas-neue-specimen-copy-small">READY PLAYER ONE. START. PAUSE. RESUME. CONNECTED. SIGNAL STRONG.</p><span class="bebas-neue-specimen-sample">Aa Bb Cc 12345</span><span class="bebas-neue-specimen-pangram">PACK MY BOX WITH FIVE DOZEN LIQUOR JUGS</span></div><div class="cossette-specimen"><span class="cossette-specimen-title">Cossette Texte</span><p class="cossette-specimen-copy-large">Cossette Texte brings a warmer reading texture. It is friendly for longer passages, notes, instruction copy, and UI surfaces that should feel more editorial.</p><p class="cossette-specimen-copy-small">Small screens still deserve rhythm. A clear paragraph, a measured line length, and a quiet color can make a tiny interface feel surprisingly spacious.</p><span class="cossette-specimen-sample">Aa Bb Cc 12345</span><span class="cossette-specimen-pangram">Grumpy wizards make toxic brew for the jovial queen.</span></div><div class="literata-specimen"><span class="literata-specimen-title">Literata</span><p class="literata-specimen-copy-large">Literata is a serif built for long-form reading on screens. Its sturdy strokes and open counters stay legible on e-paper and low-density panels alike.</p><p class="literata-specimen-copy-small">Book text wants a serif. Chapter after chapter, the gentle contrast and generous x-height keep eyes moving without fatigue.</p><span class="literata-specimen-sample">Aa Bb Cc 12345</span><span class="literata-specimen-pangram">Grumpy wizards make toxic brew for the jovial queen.</span></div></div>

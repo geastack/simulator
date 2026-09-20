@@ -1,0 +1,60 @@
+{
+  "name": "@geastack/simulator",
+  "version": "0.1.6",
+  "description": "Browser simulator for GeaStack apps: runs the embedded framework as WebAssembly with a device-shaped preview.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geastack/simulator.git"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "simulator/index.html",
+    "simulator/tsconfig.json",
+    "simulator/vite.config.ts",
+    "simulator/src/app-loader.ts",
+    "simulator/src/app-runtime.ts",
+    "simulator/src/defaults.ts",
+    "simulator/src/framebuffer.ts",
+    "simulator/src/main.ts",
+    "simulator/src/manifest.ts",
+    "simulator/src/mirror-runtime.ts",
+    "simulator/src/vite-env.d.ts",
+    "simulator/src/generated/app-index.ts",
+    "simulator/src/style.css",
+    "targets/web/build-web.sh",
+    "targets/web/obj-up-to-date.mjs",
+    "targets/web/build-dom-web.mjs",
+    "targets/web/dev-web.mjs",
+    "targets/web/dom-web-shared.mjs",
+    "targets/web/include/",
+    "targets/web/main/",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "start": "vite preview --config simulator/vite.config.ts",
+    "dev": "vite --config simulator/vite.config.ts",
+    "build": "vite build --config simulator/vite.config.ts",
+    "test": "vitest run --root simulator && npm run test:targets",
+    "check": "tsc --noEmit -p simulator/tsconfig.json",
+    "test:targets": "for f in $(find targets -name \"*.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "dependencies": {
+    "@geastack/core": "^0.1.23",
+    "@geastack/elements": "^0.1.2",
+    "@geastack/engine": "^0.1.5",
+    "@geastack/geaos": "^0.1.3",
+    "@geastack/host": "^0.1.8",
+    "vite": "^8.0.0"
+  }
+}
