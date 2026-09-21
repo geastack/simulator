@@ -52,6 +52,7 @@ done
 # Framework source set comes from the shared manifest (single source of truth;
 # the package decomposition updates it in one place).
 GEA_CORE="$CORE_DIR"
+export GEA_CORE GEA_HOST_DIR GEA_ENGINE_DIR GEA_ELEMENTS_DIR GEA_GEAOS_PACKAGE_DIR
 # shellcheck source=/dev/null
 source "$CORE_DIR/gea_sources.sh"
 # The build lock and the app-metadata CLI moved out of @geastack/core (it
@@ -268,7 +269,11 @@ mkdir -p "$BUILD_DIR" "$PUBLIC_DIR" "$DIST_DIR"
 # last so it only supplies web_display.h (its stale display.h/touch.h are
 # superseded by lib/gea-embedded/include and must not shadow them).
 INCLUDES=()
-while IFS= read -r __i; do INCLUDES+=("$__i"); done < <(gea_fw_include_flags)
+__fw_include_flags="$(gea_fw_include_flags)"
+while IFS= read -r __i; do
+  [[ -n "$__i" ]] || continue
+  INCLUDES+=("$__i")
+done <<< "$__fw_include_flags"
 INCLUDES+=( -I"$ROOT_DIR/targets/web/include" )
 # Generated geatsc support headers include files named string.h and number.h.
 # They are C++ headers and must not precede the C standard library while the
@@ -305,7 +310,11 @@ fi
 # against today's C++ host headers; the host/*.cpp set replaces them. Only the
 # pure-C vendored GIF decoder stays a C TU.
 C_SOURCES=()
-while IFS= read -r __c; do C_SOURCES+=("$__c"); done < <(gea_fw_c_sources)
+__fw_c_sources="$(gea_fw_c_sources)"
+while IFS= read -r __c; do
+  [[ -n "$__c" ]] || continue
+  C_SOURCES+=("$__c")
+done <<< "$__fw_c_sources"
 
 # CXX_SCOPE runs parallel to CXX_SOURCES: "fw" for a framework TU (identical
 # bytes for every app, so it can come from the shared object cache) and "app" for
@@ -323,7 +332,11 @@ add_fw_cxx \
   "$ROOT_DIR/targets/web/main/web_power.cpp" \
   "$ROOT_DIR/targets/web/main/web_storage_service.cpp" \
   "$ROOT_DIR/targets/web/main/web_camera.cpp"
-while IFS= read -r __s; do add_fw_cxx "$__s"; done < <(gea_fw_cxx_sources)
+__fw_cxx_sources="$(gea_fw_cxx_sources)"
+while IFS= read -r __s; do
+  [[ -n "$__s" ]] || continue
+  add_fw_cxx "$__s"
+done <<< "$__fw_cxx_sources"
 
 # The application entry is framework code and compiles identically for every app.
 add_fw_cxx "$CORE_DIR/gea_app_entry.cpp"
@@ -793,7 +806,7 @@ if (( ${#APP_EXPORTED_FUNCTIONS[@]} > 0 )); then
   ' "$EXPORTED_FUNCTIONS" "${APP_EXPORTED_FUNCTIONS[@]}")"
 fi
 
-emcc $OPT \
+em++ $OPT \
   "${OBJ_FILES[@]}" \
   "${PRELOAD_ARGS[@]+"${PRELOAD_ARGS[@]}"}" \
   -o "$DIST_DIR/module.js" \
