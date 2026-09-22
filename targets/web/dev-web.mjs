@@ -180,27 +180,6 @@ const harnessPlugin = {
   },
 }
 
-// Pure-template gea components (only a `template()` method, reading module-level
-// stores) compile to CompiledStaticComponent. gea's fine-grained HMR runtime only
-// re-renders *reactive* component instances — those that call created() and thus
-// self-register (CompiledComponent/reactive). Static components never call
-// created(), so editing one is silently swallowed by its injected self-accept and
-// never appears until a manual refresh. Force a full reload for app scripts so
-// edits show automatically; CSS keeps its native instant/fine-grained HMR.
-const appScriptReloadPlugin = {
-  name: 'gea-web-dev-script-reload',
-  handleHotUpdate(ctx) {
-    const file = ctx.file
-    if (!file.startsWith(appDir + path.sep)) return
-    if (file.includes('/node_modules/')) return
-    if (/\.css$/.test(file)) return // keep instant CSS HMR
-    if (/\.(tsx?|jsx?|mjs)$/.test(file)) {
-      ctx.server.ws.send({ type: 'full-reload', path: '*' })
-      return [] // skip gea's no-op static-component self-accept for app scripts
-    }
-  },
-}
-
 const server = await createServer({
   root: appDir,
   configFile: false, // an app's own vite.config.ts targets the C++/WASM build
@@ -209,7 +188,6 @@ const server = await createServer({
   clearScreen: false,
   plugins: [
     harnessPlugin,
-    appScriptReloadPlugin,
     createRuntimeBridgePlugin({ coreRoot, appDir }),
     compatTransform,
     withoutTsconfigWrite(geaPlugin()),
