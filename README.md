@@ -4,7 +4,7 @@ Web simulator and web target support for Gea applications.
 
 This repo owns the browser-based development loop, app loading/runtime mirror,
 framebuffer and input parity tests, and the web target scripts used by examples
-and the future CLI.
+and the CLI.
 
 ## What Is Here
 
@@ -61,8 +61,8 @@ targets/web/build-web.sh watch
 
 ## License
 
-Apache-2.0 (see `LICENSE`). Use it, change it, ship closed-source products on
-it, no strings attached. The only GeaStack code under a different license is
+Apache-2.0 (see `LICENSE`). You can ship closed-source products
+built on it. The only GeaStack code under a different license is
 the embedded board support (`targets` and `@geastack/chips`, GPL-3.0-only):
 shipping closed-source firmware through those needs a commercial license.
 Contact [contact@geastack.com](mailto:contact@geastack.com) for commercial terms, support and hosted builds.
