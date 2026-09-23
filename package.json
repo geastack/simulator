@@ -1,6 +1,6 @@
 {
   "name": "@geastack/simulator",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Browser simulator for GeaStack apps: runs the embedded framework as WebAssembly with a device-shaped preview.",
   "license": "Apache-2.0",
   "repository": {
@@ -50,7 +50,7 @@
     "vitest": "latest"
   },
   "dependencies": {
-    "@geastack/core": "^0.1.23",
+    "@geastack/core": "^0.1.24",
     "@geastack/elements": "^0.1.2",
     "@geastack/engine": "^0.1.5",
     "@geastack/geaos": "^0.1.3",
