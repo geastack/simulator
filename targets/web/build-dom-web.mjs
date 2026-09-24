@@ -33,10 +33,12 @@ import {
   assertGeaRuntime,
   buildAliases,
   createCompatPlugin,
+  createDotEnvPlugin,
   createRuntimeBridgePlugin,
   harnessHtml,
   loadBabel,
   loadCompatTransform,
+  loadDotEnvDefines,
   loadGeaPlugin,
   loadVite,
   parseCommonArgs,
@@ -86,11 +88,13 @@ let coreRoot
 let build
 let geaPlugin
 let transformGeaEmbeddedCompatSource
+let dotEnvDefines
 try {
   coreRoot = resolveCoreRoot({ appDir, scriptDir })
   ;({ build } = await loadVite(coreRoot))
   geaPlugin = await loadGeaPlugin(coreRoot)
   ;({ transformGeaEmbeddedCompatSource } = await loadCompatTransform(coreRoot))
+  ;({ dotEnvDefines } = await loadDotEnvDefines(coreRoot))
 } catch (error) {
   console.error(error.message)
   process.exit(1)
@@ -113,6 +117,13 @@ const preloadMounts = args.flags['--no-preload'] ? [] : webPreloadMounts(app)
 // it is at the right depth without ever existing on disk. The compat transform
 // runs as the same plugin dev uses.
 const alias = buildAliases({ coreRoot, appDir })
+// Vite folds every `import.meta.env.KEY` define into the object it substitutes
+// for a bare `import.meta.env`, so passing them to `define` would ship every
+// .env value to any code that reads the whole object. Those are inlined into
+// the app's sources per member expression instead, as dev-web does; only the
+// `process.env.KEY` spellings, which Vite replaces one by one, stay in `define`.
+const defines = dotEnvDefines(appDir)
+const processEnvDefines = Object.fromEntries(Object.entries(defines).filter(([key]) => key.startsWith('process.env.')))
 const harnessPath = path.join(appDir, 'index.html')
 const harnessSource = harnessHtml({ title: app.appName, entry: app.entry })
 if (fs.existsSync(harnessPath)) {
@@ -151,11 +162,13 @@ await build({
   plugins: [
     harnessPlugin,
     createRuntimeBridgePlugin({ coreRoot, appDir }),
+    createDotEnvPlugin(defines, loadBabel(coreRoot)),
     createCompatPlugin(transformGeaEmbeddedCompatSource, loadBabel(coreRoot)),
     withoutTsconfigWrite(geaPlugin()),
   ],
   esbuild: { jsx: 'preserve' }, // geaPlugin (pre) rewrites every JSX site; esbuild must not touch it
   resolve: { alias },
+  define: processEnvDefines,
   // See dev-web.mjs: one @geajs/core identity, or stores mutate into a registry
   // no binding is subscribed to.
   // See dev-web.mjs: one @geajs/core identity, or stores mutate into a registry

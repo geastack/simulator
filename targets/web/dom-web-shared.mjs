@@ -380,6 +380,120 @@ export async function loadCompatTransform(coreRoot) {
   return import(pathToFileURL(entry).href)
 }
 
+export async function loadDotEnvDefines(coreRoot) {
+  const entry = path.join(coreRoot, 'scripts/dotenv-defines.mjs')
+  if (!fs.existsSync(entry)) throw new Error(`@geastack/core is missing the dotenv defines: ${entry}`)
+  return import(pathToFileURL(entry).href)
+}
+
+/**
+ * Inlines the app's `.env` defines (`process.env.KEY`, `import.meta.env.KEY`)
+ * as a `pre` Vite plugin: in dev, where Vite's own `define` isn't used, and
+ * in the build for `import.meta.env.KEY`, which `define` would also fold into
+ * the whole `import.meta.env` object. Only real member expressions are
+ * replaced -- located through babel's AST, so matching text inside strings,
+ * templates and comments is untouched.
+ */
+export function createDotEnvPlugin(loadDefines, babel) {
+  let defines
+  if (!babel) throw new Error('@geastack/core is missing @babel/parser, needed to inline .env values')
+  return {
+    name: 'gea-dotenv',
+    enforce: 'pre',
+    configResolved() {
+      // Vite reuses inline plugin instances when restarting the dev server.
+      defines = typeof loadDefines === 'function' ? loadDefines() : loadDefines
+    },
+    configureServer(server) {
+      const example = path.join(server.config.root, '.env.example')
+      server.watcher.add(example)
+      // Vite already restarts for .env; extend that behavior to the contract.
+      const onChange = (file) => {
+        if (path.resolve(file) === example) {
+          void server.restart().catch((error) => server.config.logger.error(error.stack || error.message))
+        }
+      }
+      server.watcher.on('add', onChange).on('change', onChange).on('unlink', onChange)
+      server.httpServer?.once('close', () => {
+        for (const event of ['add', 'change', 'unlink']) server.watcher.off(event, onChange)
+      })
+    },
+    transform(code, id) {
+      const file = id.split('?')[0]
+      if (!/\.(?:[jt]sx?|m[jt]s)$/.test(file)) return null
+      if (file.includes('/node_modules/')) return null
+      if (!defines || Object.keys(defines).length === 0 || !code.includes('env')) return null
+      const out = inlineDotEnv(code, file, defines, babel)
+      return out === code ? null : { code: out, map: null }
+    },
+  }
+}
+
+/** `process.env.KEY` / `import.meta.env.KEY` as a dotted string, or null. */
+function dottedName(node) {
+  if (node.type === 'Identifier') return node.name
+  if (node.type === 'MetaProperty') return `${node.meta.name}.${node.property.name}`
+  const member = node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression'
+  if (!member || node.computed || node.property.type !== 'Identifier') return null
+  const object = dottedName(node.object)
+  return object === null ? null : `${object}.${node.property.name}`
+}
+
+/** The innermost object of a member chain: `process` in `process.env.KEY`. */
+function rootObject(node) {
+  while (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') node = node.object
+  return node
+}
+
+/**
+ * Whether the member expression at `p` is written to rather than read: the
+ * left of `=`/`+=`/`for...in`/`for...of`, an update operand, or a slot of a
+ * destructuring pattern (a computed key inside the pattern is still a read).
+ */
+function isAssignmentTarget(p) {
+  const parent = p.parentPath
+  if (parent.isUpdateExpression()) return true
+  if (parent.isAssignmentExpression() || parent.isForInStatement() || parent.isForOfStatement() || parent.isAssignmentPattern()) {
+    return p.key === 'left'
+  }
+  if (parent.isArrayPattern() || parent.isRestElement()) return true
+  return parent.isObjectProperty() && p.key === 'value' && parent.parentPath.isObjectPattern()
+}
+
+export function inlineDotEnv(code, filename, defines, babel) {
+  const { parser, traverse } = babel
+  const plugins = ['decorators-legacy']
+  if (/\.[cm]?tsx?$/.test(filename)) plugins.push('typescript')
+  if (!/\.[cm]?ts$/.test(filename)) plugins.push('jsx')
+  let ast
+  try {
+    ast = parser.parse(code, { sourceType: 'module', plugins, sourceFilename: filename })
+  } catch (error) {
+    throw new Error(`Unable to inline .env expressions in ${filename}: ${error.message}`, { cause: error })
+  }
+  const edits = []
+  traverse(ast, {
+    // `process.env?.KEY` is an OptionalMemberExpression; it must go too, or a
+    // bare `process` reference reaches the browser.
+    'MemberExpression|OptionalMemberExpression'(p) {
+      const literal = defines[dottedName(p.node)]
+      if (literal === undefined) return
+      // An assignment target can't become a literal; leave it as written.
+      if (isAssignmentTarget(p)) return
+      // Runtime bindings shadow the global; ambient declarations are erased.
+      const binding = p.scope.getBinding(rootObject(p.node).name)
+      if (binding && !binding.path.node.declare && !binding.path.parent?.declare) return
+      edits.push([p.node.start, p.node.end, literal])
+      p.skip()
+    },
+  })
+  let out = code
+  for (const [start, end, literal] of edits.sort((a, b) => b[0] - a[0])) {
+    out = out.slice(0, start) + literal + out.slice(end)
+  }
+  return out
+}
+
 export function createCompatPlugin(transformGeaEmbeddedCompatSource, babel = null) {
   return {
     name: 'gea-embedded-compat',
