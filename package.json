@@ -43,7 +43,8 @@
     "build": "vite build --config simulator/vite.config.ts",
     "test": "vitest run --root simulator && npm run test:targets",
     "check": "tsc --noEmit -p simulator/tsconfig.json",
-    "test:targets": "for f in $(find targets -name \"*.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done"
+    "test:targets": "for f in $(find targets -name \"*.test.mjs\" -not -name \"*.browser.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done",
+    "test:browser": "for f in $(find targets -name \"*.browser.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

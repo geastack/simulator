@@ -32,13 +32,23 @@ npm run build
 npm run start
 ```
 
-Run checks:
+Run checks (no browser installation required):
 
 ```sh
 npm run check
-npx playwright install chromium
 npm test
 ```
+
+Run browser tests for hot reload and environment variables when working on those
+features. Install Chromium once before the first run:
+
+```sh
+npx playwright install chromium
+npm run test:browser
+```
+
+Browser tests use the `*.browser.test.mjs` suffix and are excluded from
+`npm test` and `npm run test:targets`.
 
 Run a specific example through the web target:
 
