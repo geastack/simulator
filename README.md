@@ -59,6 +59,9 @@ targets/web/build-web.sh watch
 
 ## Documentation
 
+- [WPT CSS conformance rig](test/wpt/README.md): run upstream CSS reftests
+  against the simulator renderer with automated framebuffer diffs and reports.
+
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): simulator runtime, target
   scripts, generated apps, and parity tests.
 

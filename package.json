@@ -1,6 +1,6 @@
 {
   "name": "@geastack/simulator",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Browser simulator for GeaStack apps: runs the embedded framework as WebAssembly with a device-shaped preview.",
   "license": "Apache-2.0",
   "repository": {
@@ -38,23 +38,33 @@
     "access": "public"
   },
   "scripts": {
+    "wpt:import": "node test/wpt/import.mjs",
+    "wpt:build": "node test/wpt/build.mjs",
+    "wpt:run": "node test/wpt/run.mjs",
+    "wpt:test": "node --test test/wpt/adapter.test.mjs test/wpt/fonts.test.mjs",
+    "test:wpt": "npm run wpt:test && npm run wpt:build && npm run wpt:run",
     "start": "vite preview --config simulator/vite.config.ts",
     "dev": "vite --config simulator/vite.config.ts",
     "build": "vite build --config simulator/vite.config.ts",
     "test": "vitest run --root simulator && npm run test:targets",
     "check": "tsc --noEmit -p simulator/tsconfig.json",
     "test:targets": "for f in $(find targets -name \"*.test.mjs\" -not -name \"*.browser.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done",
+    "wpt:expand": "node test/wpt/expand.mjs",
     "test:browser": "for f in $(find targets -name \"*.browser.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "typescript": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "parse5": "8.0.1",
+    "pngjs": "7.0.0",
+    "postcss": "8.5.28",
+    "postcss-value-parser": "4.2.0"
   },
   "dependencies": {
-    "@geastack/core": "^0.1.24",
+    "@geastack/core": "^0.1.26",
     "@geastack/elements": "^0.1.2",
-    "@geastack/engine": "^0.1.5",
+    "@geastack/engine": "^0.1.6",
     "@geastack/geaos": "^0.1.3",
     "@geastack/host": "^0.1.8",
     "vite": "^8.0.0"

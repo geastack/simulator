@@ -11,6 +11,7 @@ import {
   dispatchAppPointerEvent2,
   dispatchTouchDown,
   dispatchTouchMove,
+  dispatchPointerHover,
   dispatchTouchUp,
   hitTestApp,
   initializeAppRuntime,
@@ -1258,6 +1259,13 @@ canvas.addEventListener('pointerdown', async event => {
 canvas.addEventListener('pointermove', async event => {
   const viewport = getActiveAppViewport()
   if (!viewport) return
+  if (event.pointerType === 'mouse' && event.isPrimary && activeAppRuntime) {
+    const runtime = activeAppRuntime
+    const p = toDeviceCoords(event, viewport)
+    await dispatchPointerHover(runtime.module, p.x, p.y)
+    if (activeAppRuntime !== runtime) return
+    presentFramebuffer(runtime.module, runtime.width, runtime.height)
+  }
   if (!event.isPrimary && event.pointerId === secondaryPointerId && secondaryPressId >= 0) {
     const runtime = activeAppRuntime
     if (!runtime) return
@@ -1285,6 +1293,13 @@ canvas.addEventListener('pointermove', async event => {
     if (activeAppRuntime !== runtime) return
     presentFramebuffer(runtime.module, runtime.width, runtime.height)
   }
+})
+
+canvas.addEventListener('pointerleave', async event => {
+  if (event.pointerType !== 'mouse' || !activeAppRuntime) return
+  const runtime = activeAppRuntime
+  await dispatchPointerHover(runtime.module, -1, -1)
+  if (activeAppRuntime === runtime) presentFramebuffer(runtime.module, runtime.width, runtime.height)
 })
 
 canvas.addEventListener('pointerup', async event => {

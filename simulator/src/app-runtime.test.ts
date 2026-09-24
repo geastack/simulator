@@ -5,6 +5,7 @@ import {
   APP_POINTER_DOWN,
   dispatchAppFrame,
   dispatchAppPointerEvent,
+  dispatchPointerHover,
   getMirrorSchema,
   hitTestApp,
   initializeAppRuntime,
@@ -14,6 +15,14 @@ import {
 } from './app-runtime'
 
 describe('app runtime', () => {
+  it('applies hover input before its frame and supports older app exports', async () => {
+    const ccall = vi.fn(() => 0)
+    await dispatchPointerHover({ ccall }, 20, 30)
+    expect(ccall).not.toHaveBeenCalled()
+    await dispatchPointerHover({ ccall, _app_pointer_hover: () => 0 }, 20, 30)
+    expect(ccall).toHaveBeenNthCalledWith(1, 'app_pointer_hover', null, ['number', 'number'], [20, 30])
+    expect(ccall).toHaveBeenLastCalledWith('app_frame', null, ['number'], [expect.any(Number)], { async: true })
+  })
   it('exposes the wasm entrypoints used by the simulator', () => {
     expect(APP_RUNTIME_WASM_EXPORTS).toEqual([
       'app_init',

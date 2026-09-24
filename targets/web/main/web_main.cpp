@@ -143,6 +143,12 @@ void app_touch_move(int x, int y)
 	gea::embedded::ui::Tree::instance().pointerMove(x, y);
 }
 
+EMSCRIPTEN_KEEPALIVE
+void app_pointer_hover(int x, int y)
+{
+	gea::embedded::ui::Tree::instance().pointerHover(x, y);
+}
+
 // Dispatch a node-targeted event to the hit-tested node (press_id), mirroring
 // the macOS host (press_bridge.mm). JSX onClick/onPress handlers are delivered
 // through Tree::dispatchEvent on the target node, NOT through coordinate

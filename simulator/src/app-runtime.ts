@@ -155,6 +155,13 @@ export function dispatchTouchMove(module: WasmModule, x: number, y: number) {
   module.ccall('app_touch_move', null, ['number', 'number'], [x, y])
 }
 
+export async function dispatchPointerHover(module: WasmModule, x: number, y: number) {
+  // Older prebuilt apps predate hover-capable input.
+  if (!hasWasmExport(module, 'app_pointer_hover')) return
+  await queuedAsyncWasmCall(module, () => module.ccall('app_pointer_hover', null, ['number', 'number'], [x, y]))
+  await dispatchAppFrame(module)
+}
+
 function hasWasmExport(module: WasmModule, ident: string) {
   return typeof module[`_${ident}`] === 'function'
 }
