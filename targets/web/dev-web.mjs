@@ -38,10 +38,12 @@ import {
   assertGeaRuntime,
   buildAliases,
   createCompatPlugin,
+  createDotEnvPlugin,
   createRuntimeBridgePlugin,
   harnessHtml,
   loadBabel,
   loadCompatTransform,
+  loadDotEnvDefines,
   loadGeaPlugin,
   loadVite,
   parseCommonArgs,
@@ -91,18 +93,21 @@ let coreRoot
 let createServer
 let geaPlugin
 let transformGeaEmbeddedCompatSource
+let dotEnv
 try {
   coreRoot = resolveCoreRoot({ appDir, scriptDir })
   ;({ createServer } = await loadVite(coreRoot))
   geaPlugin = await loadGeaPlugin(coreRoot)
   ;({ transformGeaEmbeddedCompatSource } = await loadCompatTransform(coreRoot))
+  dotEnv = await loadDotEnvDefines(coreRoot)
 } catch (error) {
   console.error(error.message)
   process.exit(1)
 }
 
 const alias = buildAliases({ coreRoot, appDir })
-const compatTransform = createCompatPlugin(transformGeaEmbeddedCompatSource, loadBabel(coreRoot))
+const babel = loadBabel(coreRoot)
+const compatTransform = createCompatPlugin(transformGeaEmbeddedCompatSource, babel)
 
 // ---- the app's device files, served at their device paths ------------------
 const preloadMounts = webPreloadMounts(app)
@@ -188,6 +193,7 @@ const server = await createServer({
   clearScreen: false,
   plugins: [
     harnessPlugin,
+    createDotEnvPlugin(() => dotEnv.dotEnvDefines(appDir), babel),
     createRuntimeBridgePlugin({ coreRoot, appDir }),
     compatTransform,
     withoutTsconfigWrite(geaPlugin()),
