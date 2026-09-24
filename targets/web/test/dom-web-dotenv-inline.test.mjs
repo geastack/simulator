@@ -60,6 +60,14 @@ assert.equal(
   'function f() { return "v" }\nfunction g(process) { return process.env.KEY }',
 )
 
+// Ambient declarations are erased, while nested runtime bindings still shadow.
+for (const declaration of ['declare const process: any;', 'declare let process: any;', 'declare var process: any;', 'declare function process(): void;']) {
+  assert.equal(
+    inline(`${declaration} const value = process.env.KEY; function f(process: any) { return process.env.KEY }`),
+    `${declaration} const value = "v"; function f(process: any) { return process.env.KEY }`,
+  )
+}
+
 // A computed key in a pattern is a read, not a target.
 assert.equal(inline('({ [process.env.KEY]: x } = o)'), '({ ["v"]: x } = o)')
 

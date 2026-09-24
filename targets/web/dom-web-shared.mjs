@@ -479,8 +479,9 @@ export function inlineDotEnv(code, filename, defines, babel) {
       if (literal === undefined) return
       // An assignment target can't become a literal; leave it as written.
       if (isAssignmentTarget(p)) return
-      // A local `process` (a parameter, a variable) is not the global one.
-      if (p.scope.hasBinding(rootObject(p.node).name)) return
+      // Runtime bindings shadow the global; ambient declarations are erased.
+      const binding = p.scope.getBinding(rootObject(p.node).name)
+      if (binding && !binding.path.node.declare && !binding.path.parent?.declare) return
       edits.push([p.node.start, p.node.end, literal])
       p.skip()
     },
