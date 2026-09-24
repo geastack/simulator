@@ -1,5 +1,11 @@
 # WPT CSS reftests on Gea's simulator renderer
 
+For the end-to-end development process, start with the
+[CSS conformance developer workflow](../../docs/CSS-CONFORMANCE.md). It covers
+baseline selection, failure diagnosis, independent controls, runtime and hardware
+validation, performance comparisons, and handoff. This README also retains the
+chronological findings below; earlier counts and limitations describe those runs.
+
 This runner feeds upstream HTML/CSS into Gea's C++ tree and stylesheet APIs,
 then compares the test and reference RGB565 framebuffers. It uses the shared
 framework source manifest and the simulator's `web_display.cpp` and platform

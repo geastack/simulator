@@ -59,6 +59,10 @@ targets/web/build-web.sh watch
 
 ## Documentation
 
+- [CSS conformance developer workflow](docs/CSS-CONFORMANCE.md): establish a
+  baseline, diagnose failures, add independent regressions, validate fixes and
+  performance, and hand the work to another developer.
+
 - [WPT CSS conformance rig](test/wpt/README.md): run upstream CSS reftests
   against the simulator renderer with automated framebuffer diffs and reports.
 
