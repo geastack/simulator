@@ -1,7 +1,7 @@
 {
   "name": "@geastack/simulator",
   "version": "0.1.8",
-  "description": "Browser simulator for GeaStack apps: runs the embedded framework as WebAssembly with a device-shaped preview.",
+  "description": "DOM emulator and web development with HMR for GeaStack apps, plus an optional WebAssembly device renderer.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -29,6 +29,7 @@
     "targets/web/build-dom-web.mjs",
     "targets/web/dev-web.mjs",
     "targets/web/dom-web-shared.mjs",
+    "targets/web/dom-emulator.mjs",
     "targets/web/include/",
     "targets/web/main/",
     "LICENSE",

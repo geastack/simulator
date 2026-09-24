@@ -28,6 +28,7 @@
 //      GEA_CORE_ROOT  override the @geastack/core package directory
 //      PORT           default port
 
+import { emulatorHtml, emulatorOptions, EMULATOR_PATH } from './dom-emulator.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,7 +41,8 @@ import {
   createCompatPlugin,
   createDotEnvPlugin,
   createRuntimeBridgePlugin,
-  harnessHtml,
+  appHtml,
+  webViteConfig,
   loadBabel,
   loadCompatTransform,
   loadDotEnvDefines,
@@ -55,20 +57,22 @@ import {
 } from './dom-web-shared.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
-const packageRoot = path.resolve(scriptDir, '../..')
 
 // ---- args ------------------------------------------------------------------
-const args = parseCommonArgs(process.argv.slice(2), ['--help', '-h'])
+const args = parseCommonArgs(process.argv.slice(2), ['--help', '-h', '--emulator', '--open'])
 if (args.flags['--help'] || args.flags['-h']) {
   process.stdout.write(
     'usage: dev-web.mjs [appId] [--app-dir <dir>] [--port N] [--host <host>]\n' +
       '  --app-dir  absolute path to the app (no apps-root or id registry needed)\n' +
+      '  --emulator adjustable DOM device viewport (--width, --height, --dpr, --zoom)\n' +
+      '  --open     open the app or emulator in the browser\n' +
       '  appId      looked up in the directory this was run from\n',
   )
   process.exit(0)
 }
 const port = Number(args.flags['--port'] ?? process.env.PORT ?? 5181)
 const host = args.flags['--host'] ?? true
+const viewport = emulatorOptions(args.flags)
 // No default. This is a published package: it cannot know where the caller
 // keeps its apps, and guessing a sibling checkout only ever works on the
 // machine the guess was written on. --app-dir names one app directly; the gea
@@ -86,7 +90,6 @@ try {
   process.exit(1)
 }
 const appDir = app.appDir
-const entry = app.entry
 
 // ---- toolchain, all out of @geastack/core ----------------------------------
 let coreRoot
@@ -113,7 +116,7 @@ const compatTransform = createCompatPlugin(transformGeaEmbeddedCompatSource, bab
 const preloadMounts = webPreloadMounts(app)
 const preloadManifest = JSON.stringify(webPreloadManifest(preloadMounts))
 
-const htmlHarness = harnessHtml({ title: `${app.appName} — gea web (dev)`, entry })
+const emulate = !!args.flags['--emulator']
 
 // Serve a virtual index.html (so we never write into the app source tree) and
 // inject the host shim as the very first <head> script, before the deferred app
@@ -121,7 +124,10 @@ const htmlHarness = harnessHtml({ title: `${app.appName} — gea web (dev)`, ent
 const harnessPlugin = {
   name: 'gea-web-dev-harness',
   transformIndexHtml() {
-    return [{ tag: 'script', injectTo: 'head-prepend', children: HOST_SHIM }]
+    return [{ tag: 'script', injectTo: 'head-prepend', children: HOST_SHIM + (emulate ? `
+      window.__geaEmulatorDpr = Number(new URLSearchParams(location.search).get('__gea_emulator_dpr')) || 1;
+      window.__gea_Display.getDevicePixelRatio = function () { return window.__geaEmulatorDpr; };
+    ` : '') }]
   },
   configureServer(server) {
     // PRE middleware. The device-file URLs (/sdcard/...) and the manifest are
@@ -129,8 +135,16 @@ const harnessPlugin = {
     // /index.html before any post middleware sees it — a post handler for these
     // paths silently serves the harness html instead of the file.
     server.middlewares.use((req, res, next) => {
-      const url = (req.url || '/').split('?')[0]
+      const requestPath = (req.url || '/').split('?')[0]
+      const base = server.config.base
+      const url = base !== '/' && requestPath.startsWith(base) ? '/' + requestPath.slice(base.length) : requestPath
       if (req.method !== 'GET' && req.method !== 'HEAD') return next()
+
+      if (emulate && url === EMULATOR_PATH) {
+        res.setHeader('Content-Type', 'text/html')
+        res.end(emulatorHtml(viewport, server.config.base))
+        return
+      }
 
       if (url === PRELOAD_MANIFEST_URL) {
         res.statusCode = 200
@@ -173,7 +187,7 @@ const harnessPlugin = {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next()
         if (url !== '/' && url !== '/index.html') return next()
         try {
-          const html = await server.transformIndexHtml(req.originalUrl || '/', htmlHarness)
+          const html = await server.transformIndexHtml(req.originalUrl || '/', appHtml(app))
           res.statusCode = 200
           res.setHeader('Content-Type', 'text/html')
           res.end(html)
@@ -185,7 +199,7 @@ const harnessPlugin = {
   },
 }
 
-const server = await createServer({
+const server = await createServer(await webViteConfig(coreRoot, appDir, 'serve', {
   root: appDir,
   configFile: false, // an app's own vite.config.ts targets the C++/WASM build
   cacheDir: path.join(appDir, '.gea/build/web/dev-cache'),
@@ -208,8 +222,8 @@ const server = await createServer({
   // registries: stores mutate, bindings subscribe to the other copy, and the DOM
   // never updates — with no error anywhere. Serving it raw keeps one identity.
   optimizeDeps: { entries: [], exclude: ['@geajs/core', '@geastack/core'] },
-  server: { port, strictPort: true, host },
-})
+  server: { port, strictPort: true, host, open: args.flags['--open'] ? (emulate ? EMULATOR_PATH : '/') : false },
+}))
 
 await server.listen()
 console.log(`\n  gea web dev server (real DOM, HMR) — app: ${app.appId}`)
@@ -219,3 +233,5 @@ if (preloadMounts.length > 0) {
   for (const mount of preloadMounts) console.log(`  preload: ${mount.urlPrefix} -> ${mount.dir}`)
 }
 server.printUrls()
+
+if (emulate) console.log(`  emulator: ${(server.resolvedUrls.local[0] || server.resolvedUrls.network[0]).replace(/\/$/, '')}${EMULATOR_PATH}`)
