@@ -162,7 +162,9 @@ export async function loadVite(coreRoot) {
  * but read whichever callable the module exposes rather than assuming.
  */
 export async function loadGeaPlugin(coreRoot) {
-  const pkgDir = findPackageDirFrom('@geajs/vite-plugin', [coreRoot])
+  const pkgDir = process.env.GEA_WEB_PLUGIN_DIR
+    ? path.resolve(process.env.GEA_WEB_PLUGIN_DIR)
+    : findPackageDirFrom('@geajs/vite-plugin', [coreRoot])
   if (!pkgDir) throw new Error(`@geajs/vite-plugin could not be resolved from @geastack/core at ${coreRoot}`)
   const entry = resolvePackageExport(pkgDir, '.')
   if (!entry) throw new Error(`@geajs/vite-plugin has no resolvable entry at ${pkgDir}`)
@@ -172,6 +174,43 @@ export async function loadGeaPlugin(coreRoot) {
     throw new Error(`@geajs/vite-plugin (${entry}) exports no callable plugin factory; saw: ${Object.keys(mod).join(', ')}`)
   }
   return geaPlugin
+}
+
+// Only an explicit web config is loaded: legacy vite.config.* can target C++.
+// Required runtime transforms remain authoritative and are installed once.
+export async function webViteConfig(coreRoot, appDir, command, required) {
+  const { loadConfigFromFile, mergeConfig } = await loadVite(coreRoot)
+  const configFile = ['ts', 'mts', 'js', 'mjs', 'cts', 'cjs']
+    .map((ext) => path.join(appDir, `vite.web.config.${ext}`))
+    .find((file) => fs.existsSync(file))
+  const loaded = configFile ? await loadConfigFromFile({ command, mode: command === 'serve' ? 'development' : 'production' }, configFile, appDir) : null
+  const user = loaded?.config || {}
+  async function plugins(items) {
+    const result = []
+    for (const item of await Promise.all([items].flat(Infinity))) {
+      if (Array.isArray(item)) result.push(...await plugins(item))
+      else if (item && item.name !== 'gea-plugin') result.push(item)
+    }
+    return result
+  }
+  const config = mergeConfig(user, required)
+  config.plugins = [...await plugins(user.plugins || []), ...required.plugins]
+  // Framework identities must precede user prefix aliases.
+  const userAliases = Array.isArray(user.resolve?.alias) ? user.resolve.alias
+    : Object.entries(user.resolve?.alias || {}).map(([find, replacement]) => ({ find, replacement }))
+  config.resolve.alias = [...required.resolve.alias, ...userAliases]
+  config.configFile = false
+  if (command === 'build') {
+    config.base ??= './'
+    config.build.lib = false
+    config.build.rollupOptions = { ...config.build.rollupOptions, input: path.join(appDir, 'index.html') }
+  }
+  return config
+}
+
+export function appHtml(app) {
+  const file = path.join(app.appDir, 'index.html')
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : harnessHtml({ title: app.appName, entry: app.entry })
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +315,9 @@ const RUNTIME_BRIDGE_NAMES = new Set(['gea-embedded', '@geastack/core', '@geasta
  */
 export function createRuntimeBridgePlugin({ coreRoot, appDir }) {
   const runtimePath = path.join(coreRoot, 'runtime.ts')
-  const geaCoreDir = findPackageDirFrom('@geajs/core', [appDir, coreRoot].filter(Boolean))
+  const geaCoreDir = process.env.GEA_WEB_RUNTIME_DIR
+    ? path.resolve(process.env.GEA_WEB_RUNTIME_DIR)
+    : findPackageDirFrom('@geajs/core', [appDir, coreRoot].filter(Boolean))
   const geaCoreEntry = geaCoreDir ? resolvePackageExport(geaCoreDir, '.', ['source', 'import', 'module', 'default']) : ''
   const q = (value) => JSON.stringify(value)
   return {
@@ -318,7 +359,9 @@ export function buildAliases({ coreRoot, appDir }) {
 
   // @geajs/core: prefer the package's own "source" condition when the install
   // actually carries src/ (a workspace checkout), else its published dist.
-  const geaCoreDir = findPackageDirFrom('@geajs/core', [appDir, coreRoot].filter(Boolean))
+  const geaCoreDir = process.env.GEA_WEB_RUNTIME_DIR
+    ? path.resolve(process.env.GEA_WEB_RUNTIME_DIR)
+    : findPackageDirFrom('@geajs/core', [appDir, coreRoot].filter(Boolean))
   if (geaCoreDir) {
     const conditions = ['source', 'import', 'module', 'default']
     for (const subpath of ['./jsx-dev-runtime', './jsx-runtime', './router', './ssr', './compiler-runtime']) {
@@ -880,29 +923,27 @@ export const HOST_SHIM = `;(function () {
       try { Object.defineProperty(navigator, 'wifi', { value: wifiShim, configurable: true }) } catch (e) {}
     }
   }
-  // Camera: device-only. Stub it so camera apps mount in the browser (no live
-  // frames — the <camera> leaf just shows its CSS box) and the imperative control
-  // surface (AE / zoom / capture / record) is exercisable. isAvailable() = true so
-  // the app takes its normal "Live" path rather than the no-camera fallback.
+  // This host does not bridge browser media devices. Report unavailable so
+  // apps choose their fallback instead of displaying a fictitious live feed.
   if (typeof window.__gea_Camera === 'undefined') {
     window.__gea_Camera = {
-      width: 1280, height: 960, orientation: 0, facing: 'back', deviceCount: 1,
-      isAvailable: function () { return true },
-      hasPermission: function () { return true },
-      requestPermission: function () { return true },
-      open: function () { return true },
+      width: 1280, height: 960, orientation: 0, facing: 'back', deviceCount: 0,
+      isAvailable: function () { return false },
+      hasPermission: function () { return false },
+      requestPermission: function () { return false },
+      open: function () { return false },
       close: noop,
-      isOpen: function () { return true },
+      isOpen: function () { return false },
       draw: noop,
       capture: function () { return -1 },
       captureMirrored: function () { return -1 },
-      startRecording: function () { return true },
+      startRecording: function () { return false },
       stopRecording: function () { return 0 },
       isRecording: function () { return false },
       setFlash: noop, setZoom: noop, setMirror: noop,
       setExposure: noop, setWhiteBalance: noop, setFocus: noop, setTorch: noop,
-      deviceIdAt: function () { return 'web-camera' },
-      deviceFacingAt: function () { return 'back' }
+      deviceIdAt: function () { return '' },
+      deviceFacingAt: function () { return '' }
     }
   }
   // The "image" host: asset/image decoding AND the board filesystem

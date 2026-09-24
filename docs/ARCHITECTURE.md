@@ -3,7 +3,7 @@
 The simulator repo has two related jobs:
 
 1. Provide a browser development app for Gea programs.
-2. Provide the web target scripts used by examples, tests, and future CLI work.
+2. Provide the web target scripts used by examples, tests, and the CLI.
 
 ## Runtime Pieces
 
@@ -24,8 +24,10 @@ framebuffer behavior, fetch/media/RTC/WebSocket parity, and defaults.
 
 `targets/web` contains the target entry points:
 
-- `dev-web.mjs`: run one app in a development loop.
-- `build-web.sh`: build one app for web output.
+- `dev-web.mjs`: run one DOM app with Vite HMR; `--emulator` wraps it in a device iframe.
+- `dom-emulator.mjs`: development-only viewport shell.
+- `build-dom-web.mjs`: build production HTML/JS/CSS.
+- `build-web.sh`: compile the embedded renderer to WASM (`gea simulate --renderer wasm`).
 
 Generated outputs under `targets/web/generated` are build products.
 

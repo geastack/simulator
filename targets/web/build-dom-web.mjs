@@ -17,7 +17,7 @@
 //   node targets/web/build-dom-web.mjs --app-dir <absolute app dir> [--out-dir <dir>] [--base /path/]
 //   node targets/web/build-dom-web.mjs <appId> [--out-dir <dir>]     (run from the project)
 //
-// --out-dir defaults to <app>/.gea/build/web/dist — the app's own build tree,
+// --out-dir defaults to <app>/.gea/build/web/site — the app's own build tree,
 // beside the board builds it already writes there. Never node_modules, never a
 // newly invented scratch directory.
 //
@@ -35,7 +35,8 @@ import {
   createCompatPlugin,
   createDotEnvPlugin,
   createRuntimeBridgePlugin,
-  harnessHtml,
+  appHtml,
+  webViteConfig,
   loadBabel,
   loadCompatTransform,
   loadDotEnvDefines,
@@ -50,7 +51,6 @@ import {
 } from './dom-web-shared.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
-const packageRoot = path.resolve(scriptDir, '../..')
 
 // ---- args ------------------------------------------------------------------
 const args = parseCommonArgs(process.argv.slice(2), ['--help', '-h', '--no-preload'])
@@ -58,7 +58,7 @@ if (args.flags['--help'] || args.flags['-h']) {
   process.stdout.write(
     'usage: build-dom-web.mjs [appId] [--app-dir <dir>] [--out-dir <dir>] [--base <path>]\n' +
       '  --app-dir   absolute path to the app (no apps-root or id registry needed)\n' +
-      '  --out-dir   static site output (default <app>/.gea/build/web/dist)\n' +
+      '  --out-dir   static site output (default <app>/.gea/build/web/site)\n' +
       '  --base      public base path for emitted asset URLs (default ./)\n',
   )
   process.exit(0)
@@ -80,8 +80,8 @@ try {
 }
 const appDir = app.appDir
 const webBuildDir = path.join(appDir, '.gea/build/web')
-const outDir = path.resolve(args.flags['--out-dir'] || path.join(webBuildDir, 'dist'))
-const base = args.flags['--base'] || './'
+const outDir = path.resolve(args.flags['--out-dir'] || path.join(webBuildDir, 'site'))
+const base = args.flags['--base']
 
 // ---- toolchain, all out of @geastack/core ----------------------------------
 let coreRoot
@@ -111,8 +111,7 @@ const preloadMounts = args.flags['--no-preload'] ? [] : webPreloadMounts(app)
 // points at nothing, and Vite reports it only as "didn't resolve at build
 // time, it will remain unchanged" before shipping a site with no fonts.
 //
-// Vite still needs an html entry inside the root, and the app source tree is
-// not ours to write into. So the harness html is VIRTUAL: `<app>/index.html`
+// Use application HTML when present, otherwise a virtual fallback: `<app>/index.html`
 // is named as the rollup input and served from memory by a `pre` load hook, so
 // it is at the right depth without ever existing on disk. The compat transform
 // runs as the same plugin dev uses.
@@ -125,10 +124,7 @@ const alias = buildAliases({ coreRoot, appDir })
 const defines = dotEnvDefines(appDir)
 const processEnvDefines = Object.fromEntries(Object.entries(defines).filter(([key]) => key.startsWith('process.env.')))
 const harnessPath = path.join(appDir, 'index.html')
-const harnessSource = harnessHtml({ title: app.appName, entry: app.entry })
-if (fs.existsSync(harnessPath)) {
-  console.warn(`  note: ${path.relative(appDir, harnessPath)} exists in the app and is ignored — the harness html is generated.`)
-}
+const harnessSource = appHtml(app)
 
 // Deliberately NOT `enforce: 'pre'`. A pre plugin's transformIndexHtml runs
 // ahead of vite:build-html's own html transform, and the inline `<style>` in
@@ -152,9 +148,9 @@ const harnessPlugin = {
   },
 }
 
-await build({
+await build(await webViteConfig(coreRoot, appDir, 'build', {
   root: appDir,
-  base,
+  ...(base ? { base } : {}),
   configFile: false, // an app's own vite.config.ts targets the C++/WASM build
   cacheDir: path.join(webBuildDir, 'build-cache'),
   clearScreen: false,
@@ -171,15 +167,13 @@ await build({
   define: processEnvDefines,
   // See dev-web.mjs: one @geajs/core identity, or stores mutate into a registry
   // no binding is subscribed to.
-  // See dev-web.mjs: one @geajs/core identity, or stores mutate into a registry
-  // no binding is subscribed to.
   optimizeDeps: { exclude: ['@geajs/core', '@geastack/core'] },
   build: {
     outDir,
     emptyOutDir: true,
     rollupOptions: { input: harnessPath },
   },
-})
+}))
 
 // ---- the app's device files, emitted at their device paths -----------------
 function copyDir(srcDir, dstDir) {

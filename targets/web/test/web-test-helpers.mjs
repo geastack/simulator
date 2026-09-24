@@ -75,9 +75,9 @@ export async function withWebFixture(name, run) {
     await run({
       appDir,
       write(file, source) { writeFileSync(join(appDir, file), source) },
-      async start() {
+      async start(args = []) {
         const port = await freePort()
-        const child = launch('dev-web.mjs', ['--app-dir', appDir, '--host', '127.0.0.1', '--port', String(port)])
+        const child = launch('dev-web.mjs', ['--app-dir', appDir, '--host', '127.0.0.1', '--port', String(port), ...args])
         children.push(child)
         const url = `http://127.0.0.1:${port}`
         try {
