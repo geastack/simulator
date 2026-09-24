@@ -422,6 +422,7 @@ export function createDotEnvPlugin(loadDefines, babel) {
       const file = id.split('?')[0]
       if (!/\.(?:[jt]sx?|m[jt]s)$/.test(file)) return null
       if (file.includes('/node_modules/')) return null
+      if (!defines || Object.keys(defines).length === 0 || !code.includes('env')) return null
       const out = inlineDotEnv(code, file, defines, babel)
       return out === code ? null : { code: out, map: null }
     },
