@@ -46,6 +46,7 @@
     "test:targets": "for f in $(find targets -name \"*.test.mjs\" -not -path \"*/node_modules/*\" | sort); do echo \"==> $f\"; node \"$f\" || exit 1; done"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "typescript": "latest",
     "vitest": "latest"
   },

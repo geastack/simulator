@@ -36,6 +36,7 @@ Run checks:
 
 ```sh
 npm run check
+npx playwright install chromium
 npm test
 ```
 

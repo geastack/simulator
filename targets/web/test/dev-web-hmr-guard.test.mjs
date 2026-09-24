@@ -1,71 +1,41 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import net from 'node:net'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect } from '@playwright/test'
+import { fetchText, waitFor, withWebFixture } from './web-test-helpers.mjs'
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const devServer = resolve(webRoot, 'dev-web.mjs')
-const appDir = resolve(webRoot, '../../../examples/apps/counter-jsx')
-const toolchain = resolve(webRoot, '../../../examples/node_modules/@geastack/core')
+await withWebFixture('hmr-app', async ({ write, start, page: newPage }) => {
+  write('index.tsx', "import { mount } from '@geastack/core'\nimport { App } from './components/App'\nmount(App)\n")
+  const reactive = (label) => `import { ReactiveComponent } from '@geastack/core'
+export class App extends ReactiveComponent {
+  count = 0
+  template() { return <button class="count" onClick={() => this.count++}>${label}: {this.count}</button> }
+}`
+  write('components/App.tsx', reactive('before'))
+  const server = await start()
+  const served = (await fetchText(`${server.url}/components/App.tsx`)).split('//# sourceMappingURL')[0]
+  assert.match(served, /if \(!__patched\) import\.meta\.hot\.invalidate\(\)/)
+  const page = await newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(server.url)
+  await page.locator('.count').click()
+  await expect(page.locator('.count')).toHaveText('before: 1')
+  await page.evaluate(() => { window.hmrSentinel = 'same-page' })
+  write('components/App.tsx', reactive('after'))
+  await expect(page.locator('.count')).toHaveText('after: 1')
+  assert.equal(await page.evaluate(() => window.hmrSentinel), 'same-page', 'reactive edit reloaded the page')
+  await page.locator('.count').click()
+  await expect(page.locator('.count')).toHaveText('after: 2')
 
-if (!existsSync(appDir) || !existsSync(toolchain)) {
-  console.log(`dev-web-hmr-guard: skipped, no installed gea app at ${appDir}`)
-  process.exit(0)
-}
-
-async function freePort() {
-  const probe = net.createServer()
-  await new Promise((r) => probe.listen(0, '127.0.0.1', r))
-  const { port } = probe.address()
-  await new Promise((r) => probe.close(r))
-  return port
-}
-
-async function startDevServer(port) {
-  const child = spawn('node', [devServer, '--app-dir', appDir, '--port', String(port)], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  const output = []
-  child.stdout.on('data', (d) => output.push(String(d)))
-  child.stderr.on('data', (d) => output.push(String(d)))
-  const deadline = Date.now() + 120_000
-  while (Date.now() < deadline) {
-    if (output.join('').includes('Local:')) return child
-    if (child.exitCode !== null) throw new Error(`dev server exited:\n${output.join('')}`)
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  child.kill('SIGKILL')
-  throw new Error(`dev server never listened:\n${output.join('')}`)
-}
-
-const port = await freePort()
-const server = await startDevServer(port)
-try {
-  const response = await fetch(`http://127.0.0.1:${port}/components/App.tsx`)
-  assert.equal(response.status, 200)
-  const served = (await response.text()).split('//# sourceMappingURL')[0]
-  const code = served.replace(/\s+/g, ' ')
-
-  const selfAccept = /import\.meta\.hot\.accept\(\(?newModule\)? =>/.exec(code)
-  assert.ok(selfAccept, 'the served component lost its HMR self-accept')
-  const nextAccept = code.indexOf('import.meta.hot.accept(', selfAccept.index + 1)
-  const acceptBody = nextAccept === -1 ? code.slice(selfAccept.index) : code.slice(selfAccept.index, nextAccept)
-
-  assert.ok(acceptBody.includes('let __patched = false'), 'self-accept does not track whether anything was patched')
-  assert.match(
-    acceptBody,
-    /__patched = handleComponentUpdate\([\s\S]*?\) \|\| __patched/,
-    'self-accept discards the handleComponentUpdate result',
-  )
-  assert.match(
-    acceptBody,
-    /if \(!__patched\) import\.meta\.hot\.invalidate\(\)/,
-    'an unpatchable update is swallowed instead of invalidating',
-  )
-
-  console.log('dev-web serves components whose HMR self-accept invalidates when nothing could be patched')
-} finally {
-  server.kill('SIGTERM')
-}
+  // Establish a fresh static mount before testing its edit/fallback path.
+  const staticComponent = (label) => `export function App() { return <p class="static">${label}</p> }`
+  write('components/App.tsx', staticComponent('static-before'))
+  await waitFor(async () => (await fetchText(`${server.url}/components/App.tsx`)).includes('static-before'))
+  await page.reload()
+  await expect(page.locator('.static')).toHaveText('static-before')
+  await page.evaluate(() => { window.hmrSentinel = 'before-fallback' })
+  write('components/App.tsx', staticComponent('static-after'))
+  await expect(page.locator('.static')).toHaveText('static-after')
+  assert.equal(await page.evaluate(() => window.hmrSentinel), undefined, 'unpatchable static edit did not reload')
+  assert.deepEqual(errors, [])
+  console.log('dev-web updates reactive components and reloads static components')
+})
