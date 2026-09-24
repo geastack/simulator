@@ -82,7 +82,7 @@ export async function withWebFixture(name, run) {
         const url = `http://127.0.0.1:${port}`
         try {
           await waitFor(async () => {
-            if (!child.output.includes('Local:')) return false
+            // Probe HTTP directly: Vite's colored CI output splits "Local:" with ANSI codes.
             await fetchText(url)
             return true
           }, 60_000, () => child.check())
