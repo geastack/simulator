@@ -75,6 +75,14 @@ export async function withWebFixture(name, run) {
     await run({
       appDir,
       write(file, source) { writeFileSync(join(appDir, file), source) },
+      async edit(file, source) {
+        // Vite's watcher suppresses same-file change events for 50 ms. DOM
+        // updates and error overlays can appear sooner, so an immediate next
+        // save gets dropped on Linux. Keep live edits outside that window;
+        // synchronous write() is for fixture setup before the server starts.
+        await delay(100)
+        writeFileSync(join(appDir, file), source)
+      },
       async start(args = []) {
         const port = await freePort()
         const child = launch('dev-web.mjs', ['--app-dir', appDir, '--host', '127.0.0.1', '--port', String(port), ...args])

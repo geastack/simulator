@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { fetchText, waitFor, withWebFixture } from './web-test-helpers.mjs'
 
-await withWebFixture('dotenv-app', async ({ write, start, build, page: newPage }) => {
+await withWebFixture('dotenv-app', async ({ write, edit, start, build, page: newPage }) => {
   const env = (value) => `GEA_TEST_GREETING=${value}\nGEA_TEST_UNREFERENCED=unreferenced-secret\n`
   write('.env', env('before-review'))
   write('.env.example', 'GEA_TEST_GREETING=\nGEA_TEST_OPTIONAL=\n')
@@ -38,10 +38,10 @@ export function App() {
   assert.ok(!envCode.includes('GEA_TEST_'))
   assert.ok(!envCode.includes('before-review'))
 
-  write('.env', env('after-review'))
+  await edit('.env', env('after-review'))
   await expect(page.locator('.greeting')).toHaveText(expected('after-review'))
   await expect(page.locator('.greeting')).toHaveAttribute('data-contract', 'undefined')
-  write('.env.example', 'GEA_TEST_GREETING=\nGEA_TEST_OPTIONAL=\nGEA_TEST_ADDED=\n')
+  await edit('.env.example', 'GEA_TEST_GREETING=\nGEA_TEST_OPTIONAL=\nGEA_TEST_ADDED=\n')
   await expect(page.locator('.greeting')).toHaveAttribute('data-contract', '')
   await waitFor(async () => (await fetchText(`${server.url}/values.ts`)).includes('after-review'))
   assert.ok(!(await fetchText(`${server.url}/components/App.tsx`)).includes('unreferenced-secret'))

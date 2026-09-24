@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { withWebFixture } from './web-test-helpers.mjs'
 
-await withWebFixture('dom-emulator', async ({ write, start, page: newPage, build }) => {
+await withWebFixture('dom-emulator', async ({ write, edit, start, page: newPage, build }) => {
   write('index.html', '<!doctype html><html><head><meta name="custom" content="preserved"></head><body><aside>Custom HTML</aside><div id="app"></div><script type="module" src="/entry.tsx"></script></body></html>')
   write('entry.tsx', "import { mount } from '@geastack/core'; import { App } from '@app'; import './style.css'; mount(App)")
   // The legacy config must never enter this web pipeline.
@@ -35,10 +35,10 @@ await withWebFixture('dom-emulator', async ({ write, start, page: newPage, build
   await app.locator('.probe').click()
   await frame.evaluate(() => { window.sentinel = 'same-app' })
   await page.evaluate(() => { window.sentinel = 'same-shell' })
-  write('style.css', '.probe { color: rgb(0, 0, 255); }')
+  await edit('style.css', '.probe { color: rgb(0, 0, 255); }')
   await expect(app.locator('.probe')).toHaveCSS('color', 'rgb(0, 0, 255)')
   for (const label of ['after', 'again', 'final']) {
-    write('components/App.tsx', component(label))
+    await edit('components/App.tsx', component(label))
     await expect(app.locator('.probe')).toHaveText(`${label}: 1`)
   }
   await app.locator('.probe').click()

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
 import { fetchText, waitFor, withWebFixture } from './web-test-helpers.mjs'
 
-await withWebFixture('hmr-app', async ({ write, start, page: newPage }) => {
+await withWebFixture('hmr-app', async ({ write, edit, start, page: newPage }) => {
   write('index.tsx', "import { mount } from '@geastack/core'\nimport { App } from './components/App'\nmount(App)\n")
   const reactive = (label) => `import { ReactiveComponent } from '@geastack/core'
 export class App extends ReactiveComponent {
@@ -20,7 +20,7 @@ export class App extends ReactiveComponent {
   await page.locator('.count').click()
   await expect(page.locator('.count')).toHaveText('before: 1')
   await page.evaluate(() => { window.hmrSentinel = 'same-page' })
-  write('components/App.tsx', reactive('after'))
+  await edit('components/App.tsx', reactive('after'))
   await expect(page.locator('.count')).toHaveText('after: 1')
   assert.equal(await page.evaluate(() => window.hmrSentinel), 'same-page', 'reactive edit reloaded the page')
   await page.locator('.count').click()
@@ -28,19 +28,19 @@ export class App extends ReactiveComponent {
 
   // A runtime-base change must reload, while subsequent static edits patch.
   const staticComponent = (label) => `export function App() { return <p class="static">${label}</p> }`
-  write('components/App.tsx', staticComponent('static-before'))
+  await edit('components/App.tsx', staticComponent('static-before'))
   await waitFor(async () => (await fetchText(`${server.url}/components/App.tsx`)).includes('static-before'))
   await expect(page.locator('.static')).toHaveText('static-before')
   assert.equal(await page.evaluate(() => window.hmrSentinel), undefined, 'incompatible edit did not reload')
   await page.evaluate(() => { window.hmrSentinel = 'before-fallback' })
-  write('components/App.tsx', staticComponent('static-after'))
+  await edit('components/App.tsx', staticComponent('static-after'))
   await expect(page.locator('.static')).toHaveText('static-after')
   assert.equal(await page.evaluate(() => window.hmrSentinel), 'before-fallback', 'static edit reloaded the page')
   assert.deepEqual(errors, [])
   console.log('dev-web hot updates reactive and static components')
 })
 
-await withWebFixture('nested-hmr', async ({ write, start, page: newPage }) => {
+await withWebFixture('nested-hmr', async ({ write, edit, start, page: newPage }) => {
   write('index.tsx', "import { mount } from '@geastack/core'; import { App } from './components/App'; mount(App)")
   const parent = (label) => `import { ReactiveComponent } from '@geastack/core'
     import { Child } from './Child'
@@ -57,21 +57,21 @@ await withWebFixture('nested-hmr', async ({ write, start, page: newPage }) => {
   await expect(page.locator('.child')).toHaveText('child-before: 0')
   await page.locator('.parent').click()
   await page.evaluate(() => { window.sentinel = 'preserved'; window.oldButton = document.querySelector('.parent') })
-  write('components/Child.tsx', child('child-after'))
+  await edit('components/Child.tsx', child('child-after'))
   await expect(page.locator('.child')).toHaveText('child-after: 1')
   await expect(page.locator('.parent')).toHaveText('parent: 1')
-  write('components/App.tsx', parent('updated-parent'))
+  await edit('components/App.tsx', parent('updated-parent'))
   await expect(page.locator('.parent')).toHaveText('updated-parent: 1')
   await expect(page.locator('.child')).toHaveText('child-after: 1')
   await page.locator('.parent').click()
   await expect(page.locator('.parent')).toHaveText('updated-parent: 2')
   assert.equal(await page.evaluate(() => window.oldButton.textContent), 'parent: 1', 'detached bindings still subscribed')
-  write('components/Child.tsx', child('child-final'))
+  await edit('components/Child.tsx', child('child-final'))
   await expect(page.locator('.child')).toHaveText('child-final: 2')
   assert.equal(await page.evaluate(() => window.sentinel), 'preserved')
-  write('components/Child.tsx', 'export function Child() { return <span>')
+  await edit('components/Child.tsx', 'export function Child() { return <span>')
   await expect(page.locator('vite-error-overlay')).toHaveCount(1)
-  write('components/Child.tsx', child('recovered'))
+  await edit('components/Child.tsx', child('recovered'))
   await expect(page.locator('.child')).toHaveText('recovered: 2')
   await expect(page.locator('vite-error-overlay')).toHaveCount(0)
   assert.equal(await page.evaluate(() => window.sentinel), 'preserved')
