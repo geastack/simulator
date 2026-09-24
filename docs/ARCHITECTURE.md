@@ -59,7 +59,7 @@ For target-script work:
 
 ```sh
 targets/web/dev-web.mjs <app-id>
-targets/web/build-web.sh <app-id>
+targets/web/build-dom-web.mjs <app-id>
 ```
 
 Use a small representative app such as `watch`, then a heavier rendering app
