@@ -152,7 +152,8 @@ unrelated failed unit probe does not block that comparison.
 
 ## Current adapter scope
 
-* Standards-mode HTML, `html`/`body`/`div`/`span`/`section`, IDs/classes, inline
+* Standards-mode HTML, `html`/`body`/`div`/`span`/`section`/`strong`/`aside`/`article`,
+  the unknown elements `flexbox`/`grid`/`container`/`item`, IDs/classes, inline
   declarations, embedded and linked stylesheets. ASCII/degree text and all
   source whitespace are transported to the native layout engine. Comments do
   not interrupt a contiguous CSS text sequence.
@@ -160,8 +161,9 @@ unrelated failed unit probe does not block that comparison.
   Pixel storage and rasterization use the simulator's embedded RGB565 path.
 * HTML body margins and root text color are installed at Gea's default-style
   priority, below author styles. The display list paints onto a white viewport.
-  Paragraph display and `1em` block margins are registered as UA element rules
-  by the test bridge. The shared cascade keeps them below author rules,
+  Paragraph display and `1em` block margins, bold `strong`, and inline display
+  for the unknown elements (HTML makes them `HTMLUnknownElement`) are registered
+  as UA element rules by the test bridge. The shared cascade keeps them below author rules,
   including universal selectors; the engine does not install HTML defaults.
   Selector lists are split for the native one-selector-per-rule API. Simple
   element/class selectors use their corresponding native registration APIs.
@@ -183,6 +185,11 @@ unrelated failed unit probe does not block that comparison.
   at-rules other than basic TrueType/WOFF1 `@font-face`, `!important`, quirks mode, compound HTML/body selectors and unsupported
   HTML are explicit skips.
   These are adapter limitations, not evidence that the engine cannot support them.
+* `display` declarations are transported for `block`, `flex`, `grid`, `none`,
+  `flow-root`, `list-item`, `inline`, `inline-block`, `inline-flex` and
+  `inline-grid`; any other value is
+  a skip. Whatever the engine does not implement for these values (such as
+  list markers) shows up as a failure, not a skip.
 * Apart from that disclosed color normalization, CSS properties and values are
   sent unchanged to the engine. The imported corpus includes
   interactions with features such as floats, flex-flow and order. A failure
@@ -386,6 +393,10 @@ The default serif font is pinned upstream Gentium Plus. Its WOFF1 wrapper is
 decoded losslessly into SFNT tables, with bounds and checksums validated.
 Independent tests compare every decoded table with its source and verify the
 complete SFNT checksum. Pinned Ahem is also available as an installed test font.
+Documents that name the generic `monospace` family also load DejaVu Sans Mono
+2.35 from `test/wpt/fonts`, the rig's own font directory (upstream WPT pins no
+monospace font). It is unmodified, pinned by SHA-256 in `fonts.mjs`, and
+distributed under the Bitstream Vera license in `fonts/LICENSE-DejaVu.txt`.
 Font variants, general font matching/shaping, paragraph defaults, additional
 display modes and other character repertoires still need work.
 

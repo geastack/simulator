@@ -3,7 +3,7 @@ import { parse } from 'parse5';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { normalizeNamedColors } from './named-colors.mjs';
-import { defaultFont, ahemFont } from './fonts.mjs';
+import { defaultFont, ahemFont, monospaceFont } from './fonts.mjs';
 
 export class Unsupported extends Error {}
 
@@ -53,16 +53,17 @@ export function parseDocument(source, name, { readResource } = {}) {
   const dom = parse(source);
   if (dom.mode !== 'no-quirks') throw new Unsupported('Quirks-mode document');
   const rules = [], references = [], specs = [], normalizations = [], fonts = [], properties = new Set();
-  let title = name, fuzzy = null, count = 0;
+  let title = name, fuzzy = null, count = 0, monospace = false;
   function declarations(nodes) {
     return nodes.filter(n => n.type !== 'comment').map(n => {
       if (n.type !== 'decl') throw new Unsupported('Nested CSS or at-rule');
       if (/url\s*\(/i.test(n.value)) throw new Unsupported('CSS resource/font loading');
       if (n.important) throw new Unsupported('!important needs priority-preserving declaration transport');
-      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none)$/i.test(n.value)) throw new Unsupported('Only block/flex/grid/none display declarations are supported by this adapter');
+      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none|flow-root|list-item|inline|inline-block|inline-flex|inline-grid)$/i.test(n.value)) throw new Unsupported('Only block/flex/grid/none/flow-root/list-item/inline/inline-block/inline-flex/inline-grid display declarations are supported by this adapter');
       if (n.prop.toLowerCase() === 'content') throw new Unsupported('Generated text content');
       if (/^(animation|transition)(-|$)/i.test(n.prop)) throw new Unsupported('Animation/transition timing is not implemented by this static adapter');
       properties.add(n.prop);
+      if (/^font(-family)?$/i.test(n.prop) && /\bmonospace\b/i.test(n.value)) monospace = true;
       const value = normalizeNamedColors(n.prop, n.value);
       if (value !== n.value) normalizations.push({ property: n.prop, from: n.value, to: value });
       return [n.prop, value];
@@ -158,7 +159,7 @@ export function parseDocument(source, name, { readResource } = {}) {
       return { tag: '#text', text: n.value, attributes: [], inline: [], children: [] };
     }
     if (n.tagName === 'head') return null;
-    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br'].includes(n.tagName)) throw new Unsupported(`HTML element <${n.tagName}>`);
+    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br', 'strong', 'aside', 'article', 'flexbox', 'grid', 'container', 'item'].includes(n.tagName)) throw new Unsupported(`HTML element <${n.tagName}>`);
     if (n.namespaceURI !== 'http://www.w3.org/1999/xhtml') throw new Unsupported('Non-HTML namespace');
     if (++count > 450) throw new Unsupported('Document exceeds adapter node limit');
     const attributes = [], inline = [];
@@ -179,6 +180,7 @@ export function parseDocument(source, name, { readResource } = {}) {
   const tree = element(dom.childNodes.find(n => n.tagName === 'html'));
   if (!fonts.some(font => font.family.toLowerCase() === defaultFont.family)) fonts.unshift(defaultFont);
   if (!fonts.some(font => font.family.toLowerCase() === 'ahem')) fonts.push(ahemFont);
+  if (monospace && !fonts.some(font => font.family.toLowerCase() === 'monospace')) fonts.push(monospaceFont);
   return { title, tree, rules, fonts, references, specs, fuzzy, normalizations, properties: [...properties].sort() };
 }
 

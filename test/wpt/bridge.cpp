@@ -55,6 +55,9 @@ EMSCRIPTEN_KEEPALIVE int wpt_init(int width, int height) {
   sheet.registerUserAgentElementRule("p", "display", "block");
   sheet.registerUserAgentElementRule("p", "margin-top", "1em");
   sheet.registerUserAgentElementRule("p", "margin-bottom", "1em");
+  sheet.registerUserAgentElementRule("strong", "font-weight", "bold");
+  // Elements HTML does not define are HTMLUnknownElement: inline unless styled.
+  for (const char *tag : {"flexbox", "grid", "container", "item"}) sheet.registerUserAgentElementRule(tag, "display", "inline");
   return 1;
 }
 EMSCRIPTEN_KEEPALIVE int wpt_font(const char *family, const std::uint8_t *bytes, int length) {
