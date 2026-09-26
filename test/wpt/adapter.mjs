@@ -59,7 +59,7 @@ export function parseDocument(source, name, { readResource } = {}) {
       if (n.type !== 'decl') throw new Unsupported('Nested CSS or at-rule');
       if (/url\s*\(/i.test(n.value)) throw new Unsupported('CSS resource/font loading');
       if (n.important) throw new Unsupported('!important needs priority-preserving declaration transport');
-      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none)$/i.test(n.value)) throw new Unsupported('Only block/flex/grid/none display declarations are supported by this adapter');
+      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none|flow-root|list-item|inline-flex|inline-grid)$/i.test(n.value)) throw new Unsupported('Only block/flex/grid/none/flow-root/list-item/inline-flex/inline-grid display declarations are supported by this adapter');
       if (n.prop.toLowerCase() === 'content') throw new Unsupported('Generated text content');
       if (/^(animation|transition)(-|$)/i.test(n.prop)) throw new Unsupported('Animation/transition timing is not implemented by this static adapter');
       properties.add(n.prop);

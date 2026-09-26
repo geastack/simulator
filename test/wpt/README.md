@@ -183,6 +183,10 @@ unrelated failed unit probe does not block that comparison.
   at-rules other than basic TrueType/WOFF1 `@font-face`, `!important`, quirks mode, compound HTML/body selectors and unsupported
   HTML are explicit skips.
   These are adapter limitations, not evidence that the engine cannot support them.
+* `display` declarations are transported for `block`, `flex`, `grid`, `none`,
+  `flow-root`, `list-item`, `inline-flex` and `inline-grid`; any other value is
+  a skip. Whatever the engine does not implement for these values (such as
+  list markers) shows up as a failure, not a skip.
 * Apart from that disclosed color normalization, CSS properties and values are
   sent unchanged to the engine. The imported corpus includes
   interactions with features such as floats, flex-flow and order. A failure
