@@ -3,7 +3,7 @@ import { parse } from 'parse5';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { normalizeNamedColors } from './named-colors.mjs';
-import { defaultFont, ahemFont } from './fonts.mjs';
+import { defaultFont, ahemFont, monospaceFont } from './fonts.mjs';
 
 export class Unsupported extends Error {}
 
@@ -53,7 +53,7 @@ export function parseDocument(source, name, { readResource } = {}) {
   const dom = parse(source);
   if (dom.mode !== 'no-quirks') throw new Unsupported('Quirks-mode document');
   const rules = [], references = [], specs = [], normalizations = [], fonts = [], properties = new Set();
-  let title = name, fuzzy = null, count = 0;
+  let title = name, fuzzy = null, count = 0, monospace = false;
   function declarations(nodes) {
     return nodes.filter(n => n.type !== 'comment').map(n => {
       if (n.type !== 'decl') throw new Unsupported('Nested CSS or at-rule');
@@ -63,6 +63,7 @@ export function parseDocument(source, name, { readResource } = {}) {
       if (n.prop.toLowerCase() === 'content') throw new Unsupported('Generated text content');
       if (/^(animation|transition)(-|$)/i.test(n.prop)) throw new Unsupported('Animation/transition timing is not implemented by this static adapter');
       properties.add(n.prop);
+      if (/^font(-family)?$/i.test(n.prop) && /\bmonospace\b/i.test(n.value)) monospace = true;
       const value = normalizeNamedColors(n.prop, n.value);
       if (value !== n.value) normalizations.push({ property: n.prop, from: n.value, to: value });
       return [n.prop, value];
@@ -179,6 +180,7 @@ export function parseDocument(source, name, { readResource } = {}) {
   const tree = element(dom.childNodes.find(n => n.tagName === 'html'));
   if (!fonts.some(font => font.family.toLowerCase() === defaultFont.family)) fonts.unshift(defaultFont);
   if (!fonts.some(font => font.family.toLowerCase() === 'ahem')) fonts.push(ahemFont);
+  if (monospace && !fonts.some(font => font.family.toLowerCase() === 'monospace')) fonts.push(monospaceFont);
   return { title, tree, rules, fonts, references, specs, fuzzy, normalizations, properties: [...properties].sort() };
 }
 
