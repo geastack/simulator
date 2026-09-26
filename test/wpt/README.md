@@ -152,7 +152,8 @@ unrelated failed unit probe does not block that comparison.
 
 ## Current adapter scope
 
-* Standards-mode HTML, `html`/`body`/`div`/`span`/`section`, IDs/classes, inline
+* Standards-mode HTML, `html`/`body`/`div`/`span`/`section`/`strong`/`aside`/`article`,
+  the unknown elements `flexbox`/`grid`/`container`/`item`, IDs/classes, inline
   declarations, embedded and linked stylesheets. ASCII/degree text and all
   source whitespace are transported to the native layout engine. Comments do
   not interrupt a contiguous CSS text sequence.
@@ -160,8 +161,9 @@ unrelated failed unit probe does not block that comparison.
   Pixel storage and rasterization use the simulator's embedded RGB565 path.
 * HTML body margins and root text color are installed at Gea's default-style
   priority, below author styles. The display list paints onto a white viewport.
-  Paragraph display and `1em` block margins are registered as UA element rules
-  by the test bridge. The shared cascade keeps them below author rules,
+  Paragraph display and `1em` block margins, bold `strong`, and inline display
+  for the unknown elements (HTML makes them `HTMLUnknownElement`) are registered
+  as UA element rules by the test bridge. The shared cascade keeps them below author rules,
   including universal selectors; the engine does not install HTML defaults.
   Selector lists are split for the native one-selector-per-rule API. Simple
   element/class selectors use their corresponding native registration APIs.
