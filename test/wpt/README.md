@@ -386,6 +386,10 @@ The default serif font is pinned upstream Gentium Plus. Its WOFF1 wrapper is
 decoded losslessly into SFNT tables, with bounds and checksums validated.
 Independent tests compare every decoded table with its source and verify the
 complete SFNT checksum. Pinned Ahem is also available as an installed test font.
+Documents that name the generic `monospace` family also load DejaVu Sans Mono
+2.35 from `test/wpt/fonts`, the rig's own font directory (upstream WPT pins no
+monospace font). It is unmodified, pinned by SHA-256 in `fonts.mjs`, and
+distributed under the Bitstream Vera license in `fonts/LICENSE-DejaVu.txt`.
 Font variants, general font matching/shaping, paragraph defaults, additional
 display modes and other character repertoires still need work.
 
