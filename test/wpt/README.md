@@ -184,7 +184,8 @@ unrelated failed unit probe does not block that comparison.
   HTML are explicit skips.
   These are adapter limitations, not evidence that the engine cannot support them.
 * `display` declarations are transported for `block`, `flex`, `grid`, `none`,
-  `flow-root`, `list-item`, `inline-flex` and `inline-grid`; any other value is
+  `flow-root`, `list-item`, `inline`, `inline-block`, `inline-flex` and
+  `inline-grid`; any other value is
   a skip. Whatever the engine does not implement for these values (such as
   list markers) shows up as a failure, not a skip.
 * Apart from that disclosed color normalization, CSS properties and values are
