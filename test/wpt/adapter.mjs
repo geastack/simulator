@@ -159,7 +159,7 @@ export function parseDocument(source, name, { readResource } = {}) {
       return { tag: '#text', text: n.value, attributes: [], inline: [], children: [] };
     }
     if (n.tagName === 'head') return null;
-    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br'].includes(n.tagName)) throw new Unsupported(`HTML element <${n.tagName}>`);
+    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br', 'strong', 'aside', 'article', 'flexbox', 'grid', 'container', 'item'].includes(n.tagName)) throw new Unsupported(`HTML element <${n.tagName}>`);
     if (n.namespaceURI !== 'http://www.w3.org/1999/xhtml') throw new Unsupported('Non-HTML namespace');
     if (++count > 450) throw new Unsupported('Document exceeds adapter node limit');
     const attributes = [], inline = [];
