@@ -154,7 +154,7 @@ unrelated failed unit probe does not block that comparison.
 
 * Standards-mode HTML, `html`/`body`/`div`/`span`/`section`/`strong`/`aside`/`article`,
   the unknown elements `flexbox`/`grid`/`container`/`item`, IDs/classes, inline
-  declarations, embedded and linked stylesheets. ASCII/degree text and all
+  declarations, embedded and linked stylesheets. ASCII, degree and ellipsis (U+2026) text and all
   source whitespace are transported to the native layout engine. Comments do
   not interrupt a contiguous CSS text sequence.
 * 800 × 600 CSS pixels, DPR 1: the WPT viewport, not the physical board viewport.
@@ -181,7 +181,7 @@ unrelated failed unit probe does not block that comparison.
   a fresh tree and an initial layout/paint. This first version has no animation
   or mutation lifecycle and does not exercise the TSX compiler/app loader.
 * Scripts, further HTML defaults and display modes, text outside
-  the native ASCII/degree repertoire, XHTML, image assets,
+  the ASCII/degree/ellipsis repertoire, XHTML, image assets,
   at-rules other than basic TrueType/WOFF1 `@font-face`, `!important`, quirks mode, compound HTML/body selectors and unsupported
   HTML are explicit skips.
   These are adapter limitations, not evidence that the engine cannot support them.
