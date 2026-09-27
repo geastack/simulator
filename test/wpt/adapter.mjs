@@ -154,7 +154,7 @@ export function parseDocument(source, name, { readResource } = {}) {
   function element(n) {
     if (n.nodeName === '#comment') return null;
     if (n.nodeName === '#text') {
-      if (/[^\t\r\n\f\x20-\x7e\u00b0]/u.test(n.value)) throw new Unsupported('Text codepoint outside native runtime font repertoire');
+      if (/[^\t\r\n\f\x20-\x7e\u00b0\u2026]/u.test(n.value)) throw new Unsupported('Text codepoint outside native runtime font repertoire');
       if (++count > 450) throw new Unsupported('Document exceeds adapter node limit');
       return { tag: '#text', text: n.value, attributes: [], inline: [], children: [] };
     }
