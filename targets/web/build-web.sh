@@ -75,9 +75,9 @@ GEA_CLI="${GEA_CLI_BIN:-$(resolve_package_dir @geastack/cli)/bin/gea.mjs}"
 # ESP32 board profile this simulator mirrors (see
 # targets/esp32-s3-touch-amoled-2.06/main/CMakeLists.txt). Override via env to
 # mirror a different board, e.g. the p4 7" panel:
-#   GEA_WEB_CPP_BOARD=esp32-p4-waveshare-touch-lcd-7 GEA_WEB_DEVICE_PIXEL_RATIO=1.0
+#   GEA_WEB_CPP_BOARD=esp32-p4-waveshare-touch-lcd-7
+# Pixel ratio is gea.targets.web.cssDevicePixelRatio in package.json.
 CPP_BOARD="${GEA_WEB_CPP_BOARD:-esp32-s3-touch-amoled-2.06}"
-DEVICE_PIXEL_RATIO="${GEA_WEB_DEVICE_PIXEL_RATIO:-1.5}"
 # GEA_COMPILER_RUNTIME_SOURCE, when non-empty, aliases @geajs/core to that file.
 # Only an explicit request sets it: build-gea-vite-geatsc.mjs otherwise resolves
 # the package's TYPED source itself (src/index.ts, walking appDir/coreRoot/
@@ -146,25 +146,14 @@ done < <(node -e '
   } catch {}
 ' "$APP_DIR/package.json")
 
-# Direct-canvas profile: mirrors the esp32 firmware (see
-# targets/esp32-s3-touch-amoled-2.06/main/CMakeLists.txt), which builds
-# canvas-3d with GEA_EMBEDDED_DIRECT_CANVAS_CONTEXT=1 — the app drives the
-# display through Display.ctx() present batches (web Display::present()
-# rasterizes them into the framebuffer) and never mounts a document tree.
-# The define is applied GLOBALLY (every C++ TU): it flips ABI-visible
-# declarations (gea::host::AnimationFrameTimestamp double->float) and inline
-# facade bodies (host/display.h, host/window.h), so defining it on only some
-# TUs breaks the link/ODR. Override per-build with GEA_WEB_DIRECT_CANVAS=0/1.
-DIRECT_CANVAS_PROFILE=0
-if [[ "$APP_ID" == "canvas-3d" || "$APP_ID" == "gea3d-cube" ]]; then DIRECT_CANVAS_PROFILE=1; fi
-DIRECT_CANVAS_PROFILE="${GEA_WEB_DIRECT_CANVAS:-$DIRECT_CANVAS_PROFILE}"
-# The C++ build gets the direct-canvas present profile, but the geatsc CODEGEN is a
-# separate axis: gea3d-cube drives the display natively (Display.present) and must
-# use the NORMAL codegen (matches the esp32 firmware: PROFILE=1, CODEGEN=0). Without
-# this split the web build mis-lowers and renders blank geometry.
-DIRECT_CANVAS_CODEGEN="$DIRECT_CANVAS_PROFILE"
-if [[ "$APP_ID" == "gea3d-cube" ]]; then DIRECT_CANVAS_CODEGEN=0; fi
-DIRECT_CANVAS_CODEGEN="${GEA_WEB_DIRECT_CANVAS_CODEGEN:-$DIRECT_CANVAS_CODEGEN}"
+# The CLI resolves the app manifest once for this native WASM build.
+# No app ID or inherited tuning variable selects the canvas ABI.
+if [[ -z "${GEA_BUILD_CONFIG_JSON:-}" || ! -f "$GEA_BUILD_CONFIG_JSON" ]]; then
+  echo "Missing native build configuration; use gea simulate --renderer wasm" >&2
+  exit 1
+fi
+DEVICE_PIXEL_RATIO="$(node -e 'console.log(require(process.argv[1]).cssDevicePixelRatio || 1.5)' "$GEA_BUILD_CONFIG_JSON")"
+
 
 # --- output roots ----------------------------------------------------------
 # Each root defaults to the exact in-checkout directory it has always used, so an
@@ -211,9 +200,9 @@ generate_one() {
   if [[ -n "${GEA_GEATSC_BIN:-}" ]]; then
     extra+=(--geatsc-bin "$GEA_GEATSC_BIN")
   fi
-  GEA_EMBEDDED_DIRECT_CANVAS_CONTEXT="$DIRECT_CANVAS_CODEGEN" \
   GEA_COMPILER_RUNTIME_SOURCE="$GEA_SOURCE_ENTRY" \
   node "$CORE_DIR/scripts/build-gea-vite-geatsc.mjs" \
+    --build-config "$GEA_BUILD_CONFIG_JSON" \
     --app-dir "$root" \
     --entry "$entry" \
     --out-dir "$out_dir" \
@@ -302,9 +291,9 @@ CXX_DEFINES=(
   -DGEA_EMBEDDED_ENABLE_VIRTUAL_KEYBOARD=0
   -DGEA_EMBEDDED_HAS_GENERATED_FONTS=1
 )
-if [[ "$DIRECT_CANVAS_PROFILE" == "1" ]]; then
-  CXX_DEFINES+=( -DGEA_EMBEDDED_DIRECT_CANVAS_CONTEXT=1 )
-fi
+while IFS= read -r define; do
+  [[ -n "$define" ]] && CXX_DEFINES+=("-D$define")
+done < <(node -e 'for (const define of require(process.argv[1]).managedDefines || []) console.log(define)' "$GEA_BUILD_CONFIG_JSON")
 
 # The legacy web_*_shim.c files predate the gea::host layer and don't compile
 # against today's C++ host headers; the host/*.cpp set replaces them. Only the
@@ -541,7 +530,7 @@ fi
 # The compiler writes `geatsc-header.txt` naming both, and only for the
 # per-file layout: a single-unit build finds no manifest and this does nothing,
 # because that unit carries its own prelude and there is no preamble-exact
-# header to precompile. Turn the layout on with `GEA_PER_FILE_UNITS=1`.
+# header to precompile. Select compiler.translationUnits="per-file" in package.json.
 #
 # Only the units named in `geatsc-sources.txt` take the PCH. The other
 # generated files in the same directory (fonts, assets) are not the compiler's
