@@ -125,8 +125,7 @@ const harnessPlugin = {
   name: 'gea-web-dev-harness',
   transformIndexHtml() {
     return [{ tag: 'script', injectTo: 'head-prepend', children: HOST_SHIM + (emulate ? `
-      window.__geaEmulatorDpr = Number(new URLSearchParams(location.search).get('__gea_emulator_dpr')) || 1;
-      window.__gea_Display.getDevicePixelRatio = function () { return window.__geaEmulatorDpr; };
+      window.__geaTargetScale = Number(new URLSearchParams(location.search).get('__gea_emulator_dpr')) || 1;
     ` : '') }]
   },
   configureServer(server) {

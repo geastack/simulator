@@ -103,10 +103,26 @@ remains available; it does not provide the DOM app's component HMR.
 
 The DOM emulator uses the same development pipeline as `gea dev`. Its iframe
 contains real Gea DOM elements, browser CSS, and native pointer/keyboard input.
-Width and height are CSS pixels. Zoom scales the preview without changing the
-app viewport. DPR controls `Display.getDevicePixelRatio()` only; it does not
-change the browser's actual `window.devicePixelRatio` or CSS media queries.
+Width and height are raw target pixels, as reported by `Display.width` and
+`Display.height`. At target scale 2, a 320 × 480 target has a 160 × 240 CSS
+viewport. A numeric JSX length `150` occupies 150 target pixels; an explicit
+`"150px"` occupies 300 target pixels. Zoom changes only preview magnification.
+The DPR control sets this target scale; it does not change the browser's actual
+`window.devicePixelRatio`. CSS viewport queries use the iframe's CSS dimensions.
 Viewport adjustments preserve the running app and HMR connection.
+
+GeaStack normalizes JSX style lengths before Gea's browser serializer runs.
+Reactive styles, style objects/spreads, inline style text and runtime JSX use
+the same conversion. Unitless properties such as opacity, flex grow and
+line-height keep their scalar meaning; custom-property tokens are preserved.
+Authored CSS units and percentages retain their CSS meaning. Gea used on its
+own still adds `px` to numeric length properties.
+
+The standalone web target starts at target scale 1, independent of the host
+screen's pixel density. Use `Display.getDevicePixelRatio()` for target scale.
+GeaStack event handlers receive pointer/touch coordinates in target pixels.
+Browser-specific APIs such as `getBoundingClientRect()` and direct CSSOM writes
+retain browser semantics (CSS pixels).
 
 ### HTML and configuration
 

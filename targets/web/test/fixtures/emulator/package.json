@@ -1,0 +1,1 @@
+{"name":"dom-emulator","private":true,"type":"module","gea":{"id":"dom-emulator","entry":"entry.tsx","runtime":"gea","targets":{"web":true}}}

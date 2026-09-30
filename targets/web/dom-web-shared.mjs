@@ -27,10 +27,11 @@
 //
 // Nothing here is C++-specific: no lib mode, no IR, no module graph, no geatsc.
 
+import { domStyleCompat } from './dom-style-transform.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
 // ---------------------------------------------------------------------------
 // package resolution (no hardcoded node_modules paths)
@@ -315,6 +316,7 @@ const RUNTIME_BRIDGE_NAMES = new Set(['gea-embedded', '@geastack/core', '@geasta
  */
 export function createRuntimeBridgePlugin({ coreRoot, appDir }) {
   const runtimePath = path.join(coreRoot, 'runtime.ts')
+  const styleRuntimePath = fileURLToPath(new URL('./dom-style-units.mjs', import.meta.url))
   const geaCoreDir = process.env.GEA_WEB_RUNTIME_DIR
     ? path.resolve(process.env.GEA_WEB_RUNTIME_DIR)
     : findPackageDirFrom('@geajs/core', [appDir, coreRoot].filter(Boolean))
@@ -337,9 +339,16 @@ export function createRuntimeBridgePlugin({ coreRoot, appDir }) {
       return null
     },
     load(id) {
+      if (geaCoreDir && id.split('?')[0] === path.join(geaCoreDir, 'src/runtime/style-value.ts')) {
+        return `import { styleValue as targetStyleValue } from ${q(styleRuntimePath)}
+export function styleProp(key) { return key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase()) }
+export function styleValue(property, value) { return String(targetStyleValue(property, value)) }
+`
+      }
       if (id !== RUNTIME_BRIDGE_RESOLVED) return null
-      if (!geaCoreEntry) return `export * from ${q(runtimePath)}\n`
-      return `export * from ${q(runtimePath)}\nexport { Component, Store } from ${q(geaCoreEntry)}\n`
+      const exports = `import ${q(styleRuntimePath)}\nexport * from ${q(runtimePath)}\n`
+      if (!geaCoreEntry) return exports
+      return `${exports}export { Component, Store } from ${q(geaCoreEntry)}\n`
     },
   }
 }
@@ -547,6 +556,7 @@ export function createCompatPlugin(transformGeaEmbeddedCompatSource, babel = nul
       if (file.includes('/node_modules/')) return null
       let out = transformGeaEmbeddedCompatSource(code, file)
       out = domComponentCompat(out, file, babel)
+      out = domStyleCompat(out, file, babel)
       return out === code ? null : { code: out, map: null }
     },
   }
@@ -781,10 +791,10 @@ export const HOST_SHIM = `;(function () {
   } catch (e) {}
   if (typeof window.__gea_Display === 'undefined') {
     window.__gea_Display = {
-      get width() { return window.innerWidth },
-      get height() { return window.innerHeight },
-      get nativeWidth() { return window.innerWidth },
-      get nativeHeight() { return window.innerHeight },
+      get width() { return window.__geaTargetWidth ?? window.innerWidth * (window.__geaTargetScale || 1) },
+      get height() { return window.__geaTargetHeight ?? window.innerHeight * (window.__geaTargetScale || 1) },
+      get nativeWidth() { return this.width },
+      get nativeHeight() { return this.height },
       ctx: null,
       orientation: 'portrait',
       supportedOrientations: [],
@@ -800,8 +810,13 @@ export const HOST_SHIM = `;(function () {
       setSupportedOrientations: noop,
       getAutoRotate: function () { return false },
       setAutoRotate: noop,
-      getDevicePixelRatio: function () { return window.devicePixelRatio || 1 },
-      setDevicePixelRatio: noop,
+      getDevicePixelRatio: function () { return window.__geaTargetScale || 1 },
+      setDevicePixelRatio: function (value) {
+        value = Number.isFinite(value) && value > 0 ? value : 1;
+        window.__geaTargetScale = value;
+        if (window.__geaSetTargetScale) window.__geaSetTargetScale(value);
+        if (window.__geaSetEmulatorScale) window.__geaSetEmulatorScale(value);
+      },
       getFrameIntervalMs: function () { return 16 },
       setFrameIntervalMs: noop,
       getFrameRate: function () { return 60 },

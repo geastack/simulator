@@ -1,0 +1,6 @@
+{
+  "name": "style-units-conformance",
+  "private": true,
+  "type": "module",
+  "gea": { "id": "style-units-conformance", "entry": "index.tsx", "runtime": "gea", "targets": { "web": true } }
+}

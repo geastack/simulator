@@ -62,16 +62,18 @@ function launch(script, args) {
   }
 }
 
-export async function withWebFixture(name, run) {
-  const appDir = mkdtempSync(join(tmpdir(), `gea-${name}-`))
+export async function withWebFixture(name, run, { fixtureDir } = {}) {
+  const appDir = fixtureDir || mkdtempSync(join(tmpdir(), `gea-${name}-`))
   const children = []
   let browser
   try {
-    mkdirSync(join(appDir, 'components'))
-    symlinkSync(resolve(webRoot, '../../node_modules'), join(appDir, 'node_modules'), 'junction')
-    writeFileSync(join(appDir, 'package.json'), JSON.stringify({
-      name, type: 'module', gea: { id: name, entry: 'index.tsx', runtime: 'gea', targets: { web: true } },
-    }))
+    if (!fixtureDir) {
+      mkdirSync(join(appDir, 'components'))
+      symlinkSync(resolve(webRoot, '../../node_modules'), join(appDir, 'node_modules'), 'junction')
+      writeFileSync(join(appDir, 'package.json'), JSON.stringify({
+        name, type: 'module', gea: { id: name, entry: 'index.tsx', runtime: 'gea', targets: { web: true } },
+      }))
+    }
     await run({
       appDir,
       write(file, source) { writeFileSync(join(appDir, file), source) },
@@ -106,8 +108,7 @@ export async function withWebFixture(name, run) {
         page.setDefaultNavigationTimeout(15_000)
         return page
       },
-      async build() {
-        const outDir = join(appDir, 'site')
+      async build(outDir = join(appDir, 'site')) {
         const child = launch('build-dom-web.mjs', ['--app-dir', appDir, '--out-dir', outDir])
         children.push(child)
         let timer
@@ -124,7 +125,7 @@ export async function withWebFixture(name, run) {
   } finally {
     try { await browser?.close() } finally {
       await Promise.all(children.map((child) => child.stop()))
-      rmSync(appDir, { recursive: true, force: true })
+      if (!fixtureDir) rmSync(appDir, { recursive: true, force: true })
     }
   }
 }

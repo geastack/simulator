@@ -1,0 +1,1 @@
+import { mount } from '@geastack/core'; import { App } from '@app'; import './style.css'; mount(App)

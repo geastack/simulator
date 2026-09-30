@@ -31,11 +31,15 @@ const values = ${initial};
 const frame = document.querySelector('iframe');
 const device = document.querySelector('#device');
 function update() {
-  frame.style.width = values.width + 'px'; frame.style.height = values.height + 'px';
-  frame.style.transform = 'scale(' + values.zoom + ')';
+  frame.style.width = values.width / values.dpr + 'px'; frame.style.height = values.height / values.dpr + 'px';
+  frame.style.transform = 'scale(' + values.zoom * values.dpr + ')';
   device.style.width = values.width * values.zoom + 'px'; device.style.height = values.height * values.zoom + 'px';
   try {
-    const app = frame.contentWindow; app.__geaEmulatorDpr = values.dpr;
+    const app = frame.contentWindow;
+    app.__geaTargetScale = values.dpr;
+    app.__geaTargetWidth = values.width; app.__geaTargetHeight = values.height;
+    app.__geaSetEmulatorScale = value => { values.dpr = value; document.getElementById('dpr').value = value; update(); };
+    if (app.__geaSetTargetScale) app.__geaSetTargetScale(values.dpr);
     if (app.location.origin === location.origin && app.location.pathname !== 'blank') {
       const url = new URL(app.location.href); url.searchParams.set('__gea_emulator_dpr', values.dpr);
       app.history.replaceState(app.history.state, '', url);
