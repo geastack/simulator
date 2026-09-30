@@ -316,6 +316,7 @@ const RUNTIME_BRIDGE_NAMES = new Set(['gea-embedded', '@geastack/core', '@geasta
  */
 export function createRuntimeBridgePlugin({ coreRoot, appDir }) {
   const runtimePath = path.join(coreRoot, 'runtime.ts')
+  const hostRuntimePath = fileURLToPath(new URL('./dom-host-runtime.mjs', import.meta.url))
   const styleRuntimePath = fileURLToPath(new URL('./dom-style-units.mjs', import.meta.url))
   const geaCoreDir = process.env.GEA_WEB_RUNTIME_DIR
     ? path.resolve(process.env.GEA_WEB_RUNTIME_DIR)
@@ -346,7 +347,7 @@ export function styleValue(property, value) { return String(targetStyleValue(pro
 `
       }
       if (id !== RUNTIME_BRIDGE_RESOLVED) return null
-      const exports = `import ${q(styleRuntimePath)}\nexport * from ${q(runtimePath)}\n`
+      const exports = `import ${q(styleRuntimePath)}\nexport * from ${q(runtimePath)}\nexport { fetchAsync, fetchReady, fetchResult, fetchRelease } from ${q(hostRuntimePath)}\n`
       if (!geaCoreEntry) return exports
       return `${exports}export { Component, Store } from ${q(geaCoreEntry)}\n`
     },

@@ -1,0 +1,10 @@
+{
+  "name": "host-runtime-fixture",
+  "type": "module",
+  "gea": {
+    "id": "host-runtime-fixture",
+    "entry": "index.ts",
+    "runtime": "gea",
+    "targets": { "web": true }
+  }
+}
