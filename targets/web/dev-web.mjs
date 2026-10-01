@@ -221,7 +221,11 @@ const server = await createServer(await webViteConfig(coreRoot, appDir, 'serve',
   // registries: stores mutate, bindings subscribe to the other copy, and the DOM
   // never updates — with no error anywhere. Serving it raw keeps one identity.
   optimizeDeps: { entries: [], exclude: ['@geajs/core', '@geastack/core'] },
-  server: { port, strictPort: true, host, open: args.flags['--open'] ? (emulate ? EMULATOR_PATH : '/') : false },
+  server: {
+    port, strictPort: true, host,
+    fs: { allow: [appDir, path.join(scriptDir, 'dom-audio-worker.mjs')] },
+    open: args.flags['--open'] ? (emulate ? EMULATOR_PATH : '/') : false,
+  },
 }))
 
 await server.listen()

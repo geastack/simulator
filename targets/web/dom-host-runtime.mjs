@@ -1,3 +1,5 @@
+import './dom-audio-runtime.mjs'
+
 // Fetch jobs expose synchronous body readers after the browser has buffered the response.
 const jobs = new Map()
 let nextJob = 1

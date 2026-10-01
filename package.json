@@ -30,6 +30,8 @@
     "targets/web/dev-web.mjs",
     "targets/web/dom-web-shared.mjs",
     "targets/web/dom-host-runtime.mjs",
+    "targets/web/dom-audio-runtime.mjs",
+    "targets/web/dom-audio-worker.mjs",
     "targets/web/dom-style-units.mjs",
     "targets/web/dom-style-transform.mjs",
     "targets/web/dom-emulator.mjs",
