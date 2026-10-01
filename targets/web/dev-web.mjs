@@ -108,6 +108,21 @@ try {
   process.exit(1)
 }
 
+// The app's `.env` inlined the same way the embedded build does it
+// (build-gea-vite-geatsc.mjs). Without this every `process.env.<KEY>` the app
+// reads throws ReferenceError in the browser and the whole app fails to mount —
+// which is what happened to weather, whose store reads GEA_WIFI_SSID at module
+// scope. This dev server is the CSS reference the native targets are compared
+// against, so it has to run the same source the device build runs.
+let envDefines = {}
+try {
+  const mod = await import(path.join(coreRoot, 'scripts/dotenv-defines.mjs'))
+  envDefines = mod.dotEnvDefines(appDir)
+} catch (error) {
+  console.warn(`  (no .env defines: ${error.message})`)
+  envDefines = {}
+}
+
 const alias = buildAliases({ coreRoot, appDir })
 const babel = loadBabel(coreRoot)
 const compatTransform = createCompatPlugin(transformGeaEmbeddedCompatSource, babel)
@@ -211,6 +226,7 @@ const server = await createServer(await webViteConfig(coreRoot, appDir, 'serve',
     compatTransform,
     withoutTsconfigWrite(geaPlugin()),
   ],
+  define: envDefines,
   esbuild: { jsx: 'preserve' }, // geaPlugin (pre) rewrites every JSX site; esbuild must not touch it
   resolve: { alias },
   // Never pre-bundle the framework. The reactive runtime keys its subscriber
