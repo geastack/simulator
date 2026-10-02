@@ -481,6 +481,10 @@ void AudioSystem::stopPlayback()
 {
 	// Web/simulator: the browser owns playback lifecycle; nothing to stop here.
 }
+void AudioSystem::flushPlayback()
+{
+	// Web/simulator: no PCM stream output is queued here, so nothing to discard.
+}
 void AudioSystem::setVolume(int v)
 {
 	if (v < 0) v = 0;
