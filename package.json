@@ -1,6 +1,6 @@
 {
   "name": "@geastack/simulator",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "DOM emulator and web development with HMR for GeaStack apps, plus an optional WebAssembly device renderer.",
   "license": "Apache-2.0",
   "repository": {
@@ -60,7 +60,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "typescript": "latest",
+    "typescript": "^5.9.3",
     "vitest": "latest",
     "parse5": "8.0.1",
     "pngjs": "7.0.0",
@@ -68,7 +68,7 @@
     "postcss-value-parser": "4.2.0"
   },
   "dependencies": {
-    "@geastack/core": "^0.1.31",
+    "@geastack/core": "^0.1.33",
     "@geastack/elements": "^0.1.3",
     "@geastack/engine": "^0.1.8",
     "@geastack/geaos": "^0.1.3",

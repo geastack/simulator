@@ -102,7 +102,11 @@ export async function withWebFixture(name, run, { fixtureDir } = {}) {
         return { url, stop: () => child.stop() }
       },
       async page() {
-        browser ||= await chromium.launch({ headless: true })
+        // A Linux host without a GPU (CI, WSL) intermittently stalls the first animation frame for 15-100 s
+        // while the out-of-process GPU/compositor connection times out, so Playwright's actionability checks
+        // (which wait on rAF) time out. Keeping the compositor and GPU work in-process avoids the handshake.
+        const linuxArgs = ['--disable-gpu', '--disable-gpu-compositing', '--in-process-gpu', '--disable-software-rasterizer']
+        browser ||= await chromium.launch({ headless: true, args: process.platform === 'linux' ? linuxArgs : [] })
         const page = await browser.newPage()
         page.setDefaultTimeout(15_000)
         page.setDefaultNavigationTimeout(15_000)
