@@ -68,11 +68,11 @@
     "postcss-value-parser": "4.2.0"
   },
   "dependencies": {
-    "@geastack/core": "^0.1.34",
-    "@geastack/elements": "^0.1.3",
-    "@geastack/engine": "^0.1.8",
+    "@geastack/core": "^0.1.35",
+    "@geastack/elements": "^0.1.4",
+    "@geastack/engine": "^0.1.11",
     "@geastack/geaos": "^0.1.3",
-    "@geastack/host": "^0.1.10",
+    "@geastack/host": "^0.1.14",
     "vite": "^8.0.0"
   }
 }
