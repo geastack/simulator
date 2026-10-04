@@ -333,7 +333,9 @@ add_app_cxx "${GENERATED_GEATSC_CPPS[@]+"${GENERATED_GEATSC_CPPS[@]}"}"
 add_app_cxx "$GENERATED_FONT_CPP"
 add_app_cxx "$GENERATED_ASSETS_CPP"
 
-# App native sources (package.json gea.nativeSources, e.g. gea3d's software
+# App native sources (package.json gea.nativeSources, resolved by the CLI's
+# manifest -- app-relative first, then node resolution, so `@demos/shared/...`
+# entries work -- e.g. gea3d's software
 # renderer): compile them and put each file's directory on the include path so the
 # generated modules can include the app's native headers — same as the
 # esp32/rp2350 firmware builds, which the web build otherwise omitted.
@@ -347,12 +349,12 @@ APP_C_SOURCES=()
 while IFS= read -r __ns; do
   [[ -z "$__ns" ]] && continue
   if [[ "$__ns" == *.c ]]; then
-    APP_C_SOURCES+=("$APP_DIR/$__ns")
+    APP_C_SOURCES+=("$__ns")
   else
-    add_app_cxx "$APP_DIR/$__ns"
+    add_app_cxx "$__ns"
   fi
-  APP_CXX_INCLUDES+=( -I"$(dirname "$APP_DIR/$__ns")" )
-done < <(node -e 'try{const p=require(process.argv[1]);const n=(p.gea&&p.gea.nativeSources)||[];for(const s of n)console.log(s)}catch(e){}' "$APP_DIR/package.json" 2>/dev/null)
+  APP_CXX_INCLUDES+=( -I"$(dirname "$__ns")" )
+done < <(node "$GEA_CLI" inspect "$APP_ID" --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const p of JSON.parse(s).nativeSourcePaths||[])console.log(p)})')
 
 OPT="${GEA_WEB_OPT:--O2}"
 OBJ_FILES=()

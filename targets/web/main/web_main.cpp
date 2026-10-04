@@ -47,9 +47,15 @@ static void drive_css_animations(int timestamp_ms)
 	const uint32_t now_ms = static_cast<uint32_t>(timestamp_ms);
 	if (!g_css_animations_started) {
 		gea::css::DeclarativeAnimations::scanAndStart(now_ms);
-		gea::embedded::ui::StyleSheet::instance().startCssAnimations(now_ms);
 		g_css_animations_started = true;
 	}
+	// Every frame, not just the first: an element that mounts later (a route
+	// change, a conditional, a list that fills after the first frame) is primed
+	// at its keyframe start pose with `started == false`, and only this call gives
+	// it a start time. Starting tracks once left every later mount frozen at its
+	// `from` pose -- an `opacity: 0` entrance stayed invisible for good. The
+	// ESP32 runtime (core/runtime.cpp run_app_frame) makes the same per-frame call.
+	gea::embedded::ui::StyleSheet::instance().startCssAnimations(now_ms);
 	gea::css::AnimationEngine::instance().tick(now_ms);
 }
 

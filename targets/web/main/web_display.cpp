@@ -26,6 +26,8 @@ namespace {
 
 gea::framework::graphics::Canvas g_canvas;
 uint16_t *g_framebuffer = nullptr;
+int g_fb_width = 0;
+int g_fb_height = 0;
 int g_brightness = 100;
 int g_flush_rows = 0;
 int g_flush_depth = 0;
@@ -43,6 +45,8 @@ int web_display_resize(int width, int height)
 	if (!next) return 0;
 
 	g_framebuffer = next;
+	g_fb_width = width;
+	g_fb_height = height;
 	std::memset(g_framebuffer, 0, pixel_count * sizeof(uint16_t));
 	g_canvas.bindPixels(g_framebuffer, width, height);
 	return 1;
@@ -69,7 +73,63 @@ void Display::clearNoFlush() { g_canvas.clear(0x0000); }
 void Display::print(const char *) {}
 void Display::flush() {}
 void Display::flushRects(const DisplayFlushRect *, int, bool) {}
-bool Display::streamRect(int, int, int, int, DisplayStreamRasterFn, void *) { return false; }
+
+// Fused rasterized flush, as the device does it minus the DMA: `raster` is
+// handed each chunk's pixels to fill (gea3d's software renderer and the engine's
+// fused display-list replay both draw this way), so with no panel transport the
+// chunk is simply the framebuffer rows themselves. A rect that spans the full
+// width is a contiguous block and is rasterized in place; a narrower one is
+// rasterized into a packed staging buffer, because a raster callback may treat
+// `width` as its row stride (rasterChunk in gea3d_native.cpp does), and copied
+// into the framebuffer rows afterwards. Out-of-bounds rects are clipped.
+bool Display::streamRect(int x, int y, int w, int h, DisplayStreamRasterFn raster, void *user)
+{
+	if (!raster || w <= 0 || h <= 0 || !g_framebuffer) return false;
+	const int fbw = g_fb_width;
+	const int fbh = g_fb_height;
+	const int x0 = x < 0 ? 0 : x;
+	const int y0 = y < 0 ? 0 : y;
+	const int x1 = (x + w - 1) < fbw - 1 ? (x + w - 1) : fbw - 1;
+	const int y1 = (y + h - 1) < fbh - 1 ? (y + h - 1) : fbh - 1;
+	if (x0 > x1 || y0 > y1) return true;
+	const int cw = x1 - x0 + 1;
+	const int ch = y1 - y0 + 1;
+
+	if (cw == fbw) {
+		raster(g_framebuffer + static_cast<size_t>(y0) * static_cast<size_t>(fbw), cw, ch, x0, y0, user);
+		return true;
+	}
+	static uint16_t *staging = nullptr;
+	static size_t staging_capacity = 0;
+	const size_t need = static_cast<size_t>(cw) * static_cast<size_t>(ch);
+	if (need > staging_capacity) {
+		uint16_t *next = static_cast<uint16_t *>(std::realloc(staging, need * sizeof(uint16_t)));
+		if (!next) return false;
+		staging = next;
+		staging_capacity = need;
+	}
+	for (int row = 0; row < ch; ++row)
+		std::memcpy(staging + static_cast<size_t>(row) * cw, g_framebuffer + static_cast<size_t>(y0 + row) * fbw + x0, static_cast<size_t>(cw) * sizeof(uint16_t));
+	raster(staging, cw, ch, x0, y0, user);
+	for (int row = 0; row < ch; ++row)
+		std::memcpy(g_framebuffer + static_cast<size_t>(y0 + row) * fbw + x0, staging + static_cast<size_t>(row) * cw, static_cast<size_t>(cw) * sizeof(uint16_t));
+	return true;
+}
+
+void Display::flushRectsRasterized(const DisplayFlushRect *rects, int count, DisplayStreamRasterFn raster, void *user, bool)
+{
+	if (!rects || count <= 0 || !raster) return;
+	for (int i = 0; i < count; ++i) streamRect(rects[i].x0, rects[i].y0, rects[i].x1 - rects[i].x0 + 1, rects[i].y1 - rects[i].y0 + 1, raster, user);
+	rebindCanvasToFramebuffer();
+}
+
+// A raster callback may rebind the draw canvas onto the chunk it was handed;
+// this restores the canvas to the framebuffer the browser presents.
+void Display::rebindCanvasToFramebuffer()
+{
+	if (!g_framebuffer) return;
+	g_canvas.bindPixels(g_framebuffer, g_fb_width, g_fb_height);
+}
 
 // Rasterize the recorded canvas-2d batch straight into the framebuffer the
 // browser presents. The shared rasterizer (also behind the ESP32 flush-chunk
