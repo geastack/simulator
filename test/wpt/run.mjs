@@ -55,11 +55,17 @@ function readBytes(name) {
   return bytes;
 }
 function read(name) { return readBytes(name).toString('utf8'); }
+function fontBytes(font) {
+  if (!font.rig) return readBytes(font.path);
+  const bytes = fs.readFileSync(path.join(root, 'fonts', font.path));
+  if (createHash('sha256').update(bytes).digest('hex') !== font.sha256) throw new Error(`Rig font modified: ${font.path}`);
+  return bytes;
+}
 // Check every imported source before running anything; missing or altered
 // fixtures are infrastructure errors, never skips or newly accepted baselines.
 for (const name of Object.keys(manifest.files)) readBytes(name);
 function render(document, actions = []) {
-  const fonts = (document.fonts || []).map(font => ({ family: font.family, bytes: sfntFont(readBytes(font.path)).toString('base64') }));
+  const fonts = (document.fonts || []).map(font => ({ family: font.family, bytes: sfntFont(fontBytes(font)).toString('base64') }));
   const r = spawnSync(process.execPath, [`${root}/render.mjs`], {
     input: JSON.stringify({ document, viewport: manifest.viewport, fonts, interactions: actions }),
     encoding: 'utf8', timeout: 30000, maxBuffer: 16 * 1024 * 1024,

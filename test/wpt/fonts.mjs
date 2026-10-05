@@ -3,6 +3,13 @@ import { inflateSync } from 'node:zlib';
 
 export const defaultFont = { family: 'serif', path: 'fonts/GentiumPlus-R.woff' };
 export const ahemFont = { family: 'Ahem', path: 'fonts/Ahem.ttf' };
+// Rig-owned fonts live in test/wpt/fonts, outside the pinned upstream corpus,
+// each pinned by its SHA-256. The CSS monospace family is DejaVu Sans Mono 2.35,
+// unmodified, under the Bitstream Vera license in fonts/LICENSE-DejaVu.txt.
+export const monospaceFont = {
+  family: 'monospace', path: 'DejaVuSansMono.ttf', rig: true,
+  sha256: '602ec86b8948cfcd956482fe64f94c36c867770149ef2f791d4613f443bcecb3',
+};
 const padded = n => Math.ceil(n / 4) * 4;
 function checksum(bytes) {
   let sum = 0;
