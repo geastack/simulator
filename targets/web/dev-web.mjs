@@ -94,12 +94,15 @@ const appDir = app.appDir
 // ---- toolchain, all out of @geastack/core ----------------------------------
 let coreRoot
 let createServer
+let projectRoot
 let geaPlugin
 let transformGeaEmbeddedCompatSource
 let dotEnv
 try {
   coreRoot = resolveCoreRoot({ appDir, scriptDir })
-  ;({ createServer } = await loadVite(coreRoot))
+  const vite = await loadVite(coreRoot)
+  ;({ createServer } = vite)
+  projectRoot = vite.searchForWorkspaceRoot(appDir, appDir)
   geaPlugin = await loadGeaPlugin(coreRoot)
   ;({ transformGeaEmbeddedCompatSource } = await loadCompatTransform(coreRoot))
   dotEnv = await loadDotEnvDefines(coreRoot)
@@ -223,7 +226,10 @@ const server = await createServer(await webViteConfig(coreRoot, appDir, 'serve',
   optimizeDeps: { entries: [], exclude: ['@geajs/core', '@geastack/core'] },
   server: {
     port, strictPort: true, host,
-    fs: { allow: [appDir, path.join(scriptDir, 'dom-audio-worker.mjs')] },
+    // An explicit allow list disables Vite's workspace detection. Keep its
+    // declared workspace boundary so sibling app assets remain accessible;
+    // an app without a workspace stays confined to its own directory.
+    fs: { allow: [projectRoot, path.join(scriptDir, 'dom-audio-worker.mjs')] },
     open: args.flags['--open'] ? (emulate ? EMULATOR_PATH : '/') : false,
   },
 }))

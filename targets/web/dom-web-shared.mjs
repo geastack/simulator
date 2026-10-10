@@ -953,6 +953,7 @@ export const HOST_SHIM = `;(function () {
       draw: noop,
       capture: function () { return -1 },
       captureMirrored: function () { return -1 },
+      captureFrame: function () { return '' },
       startRecording: function () { return false },
       stopRecording: function () { return 0 },
       isRecording: function () { return false },
