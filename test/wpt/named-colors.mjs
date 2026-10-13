@@ -159,7 +159,7 @@ const colorProperties = new Set([
   'color', 'background', 'background-color', 'background-image',
   'box-shadow', 'text-shadow', 'outline', 'outline-color',
   'text-decoration', 'text-decoration-color', 'column-rule', 'column-rule-color',
-  'fill', 'stroke', 'caret-color', 'accent-color',
+  'fill', 'stroke', 'caret-color', 'accent-color', 'border-image', 'border-image-source',
 ]);
 
 // Only declaration values in color-bearing properties are eligible. Tokenizing

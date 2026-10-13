@@ -60,7 +60,7 @@ test('passes original selectors, ordered duplicate declarations and inline value
 });
 
 test('fails closed on unsupported document semantics instead of weakening the test', () => {
-  for (const body of ['<script>doSomething()</script>', '<div onclick="run()"></div>', '<img src="a.png">', '<style>@media print {div{width:1px}}</style>', '<style>div{display:inline-block}</style>', '<style>div{color:red!important}</style>', '<html class="reftest-wait"></html>', '<link rel="stylesheet" href="a.css">', '<style>div{background:url(a.png)}</style>']) {
+  for (const body of ['<script>doSomething()</script>', '<div onclick="run()"></div>', '<img src="a.png">', '<style>@media print {div{width:1px}}</style>', '<style>div{display:table}</style>', '<style>div{color:red!important}</style>', '<html class="reftest-wait"></html>', '<link rel="stylesheet" href="a.css">', '<style>div{background:url(a.png)}</style>']) {
     assert.throws(() => parseDocument(`<!doctype html>${body}`, 'test.html'), Unsupported, body);
   }
   assert.throws(() => parseDocument('<div></div>', 'test.html'), /Quirks/);
