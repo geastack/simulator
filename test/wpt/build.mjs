@@ -16,7 +16,10 @@ for (const [key, pkg] of Object.entries({ GEA_CORE: 'core', GEA_HOST_DIR: 'host'
 }
 const manifest = await import(pathToFileURL(path.join(env.GEA_CORE, 'gea_sources.mjs')));
 const includes = [...manifest.includeFlags(env), `-I${root}/targets/web/include`];
-const sources = [...manifest.cSources(env), ...manifest.cxxSources(env),
+// audio_buffer_runtime.cpp defines compiler-declared AudioBuffer methods against
+// an app's generated gea_runtime.h. The rig compiles no app and calls none of them.
+const appSensitive = s => !env.GEA_COMPILER_RUNTIME && path.basename(s) === 'audio_buffer_runtime.cpp';
+const sources = [...manifest.cSources(env), ...manifest.cxxSources(env).filter(s => !appSensitive(s)),
   ...['web_display', 'web_platform', 'web_power', 'web_storage_service', 'web_camera'].map(n => `${root}/targets/web/main/${n}.cpp`),
   `${root}/test/wpt/bridge.cpp`];
 for (const source of sources) fs.accessSync(source);
