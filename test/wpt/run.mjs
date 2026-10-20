@@ -37,16 +37,16 @@ const root = fileURLToPath(new URL('./', import.meta.url));
 const out = fileURLToPath(new URL('../../dist/', import.meta.url));
 const manifest = JSON.parse(fs.readFileSync(`${root}/manifest.json`, 'utf8'));
 const { values, positionals } = parseArgs({
-  options: { limit: { type: 'string', default: 'all' } }, allowPositionals: true,
+  options: { limit: { type: 'string', default: 'all' }, force: { type: 'boolean', default: false } }, allowPositionals: true,
 });
-if (positionals.length > 1) throw new Error('Usage: wpt:run [filename substring] [--limit N|all] (default: all)');
+if (positionals.length > 1) throw new Error('Usage: wpt:run [filename substring] [--limit N|all] [--force] (default: all)');
 if (values.limit !== 'all' && !/^[1-9]\d*$/.test(values.limit)) throw new Error('--limit must be a positive integer or all');
 const limit = values.limit === 'all' ? manifest.tests.length : Number(values.limit);
 if (!Number.isSafeInteger(limit)) throw new Error('--limit is too large');
 const filter = positionals[0];
 const selected = manifest.tests.filter(name => name.startsWith('css/') && (!filter || name.includes(filter))).slice(0, limit);
 if (!selected.length) throw new Error(`No CSS tests match ${filter || 'the selection'}`);
-const scope = { selected: selected.length, available: manifest.tests.filter(name => name.startsWith('css/')).length, limit: values.limit, filter: filter || null };
+const scope = { selected: selected.length, available: manifest.tests.filter(name => name.startsWith('css/')).length, limit: values.limit, filter: filter || null, force: values.force };
 const build = JSON.parse(fs.readFileSync(`${out}/wpt-build.json`, 'utf8'));
 function readBytes(name) {
   if (!Object.hasOwn(manifest.files, name)) throw new Error(`Unpinned resource: ${name}`);
@@ -367,10 +367,12 @@ const results = [];
 for (const name of selected) {
   const result = { test: name, status: 'ERROR' };
   try {
-    const doc = parseDocument(read(name), name, { readResource: read });
+    const doc = parseDocument(read(name), name, { readResource: read, force: values.force });
     if (!doc.references.length) throw new Unsupported('Not a reftest');
     // Preflight all references before executing either side.
-    const references = doc.references.map(ref => ({ ...ref, document: parseDocument(read(ref.path), ref.path, { readResource: read }) }));
+    const references = doc.references.map(ref => ({ ...ref, document: parseDocument(read(ref.path), ref.path, { readResource: read, force: values.force }) }));
+    const forced = [...new Set([doc, ...references.map(ref => ref.document)].flatMap(d => d.forced))];
+    if (forced.length) result.forced = forced;
     const failures = failedPrerequisites(prerequisites, [doc, ...references.map(ref => ref.document)]);
     Object.assign(result, { title: doc.title, specs: doc.specs, properties: doc.properties, normalizations: doc.normalizations, fonts: doc.fonts });
     const actual = render(doc, interactions[name]);
@@ -400,11 +402,14 @@ for (const name of selected) {
     result.reason = error.message;
   }
   results.push(result);
-  console.log(`${result.status} ${name}${result.reason ? ` — ${result.reason}` : ''}${result.comparisons ? ` — ${result.comparisons.map(c => `${c.totalPixels} differing pixels`).join(', ')}` : ''}`);
+  console.log(`${result.status}${result.forced ? ' (forced)' : ''} ${name}${result.reason ? ` — ${result.reason}` : ''}${result.comparisons ? ` — ${result.comparisons.map(c => `${c.totalPixels} differing pixels`).join(', ')}` : ''}`);
 }
-const summary = Object.fromEntries(['PASS', 'FAIL', 'BLOCKED', 'SKIP', 'ERROR'].map(s => [s, results.filter(r => r.status === s).length]));
+const statuses = ['PASS', 'FAIL', 'BLOCKED', 'SKIP', 'ERROR'];
+const summary = Object.fromEntries(statuses.map(s => [s, results.filter(r => r.status === s).length]));
+// Statuses of the results that ran past an adapter guard; already counted in summary.
+const forcedSummary = values.force ? Object.fromEntries(statuses.map(s => [s, results.filter(r => r.forced && r.status === s).length])) : null;
 const preprocessing = { namedColors: 'CSS Color 4 named colors to RGB hex in the test adapter; runtime keyword parsing is not tested' };
-const report = { revision: manifest.revision, scope, viewport: manifest.viewport, build, preprocessing, prerequisites, summary, results };
+const report = { revision: manifest.revision, scope, viewport: manifest.viewport, build, preprocessing, prerequisites, summary, forcedSummary, results };
 fs.writeFileSync(`${out}/wpt-results.json`, JSON.stringify(report, null, 2) + '\n');
 const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const upstream = name => `https://github.com/web-platform-tests/wpt/blob/${manifest.revision}/${name}`;
@@ -412,11 +417,12 @@ fs.writeFileSync(`${out}/wpt-report.html`, `<!doctype html><meta charset="utf-8"
 <style>body{font:16px system-ui;margin:32px;color:#17202a;background:#f5f6f8}h1{margin-bottom:8px}article{background:white;padding:20px;margin:20px 0;border:1px solid #ccd2d8}section{display:flex;gap:12px;overflow:auto}figure{margin:0;min-width:260px;flex:1}img{width:100%;image-rendering:pixelated;border:1px solid #ddd}a{color:#154d91}code{overflow-wrap:anywhere}.FAIL,.ERROR{color:#b12020}.PASS{color:#17602e}.SKIP,.BLOCKED{color:#795300}</style>
 <h1>Gea · WPT CSS reftests</h1><p>Simulator RGB565 · ${manifest.viewport.width} × ${manifest.viewport.height} CSS pixels · DPR 1</p>
 <p>${scope.selected} selected CSS tests out of ${scope.available} imported. Selection follows corpus order, before rendering; skipped tests count toward the selection.${filter ? ` Filename filter: <code>${escape(filter)}</code>.` : ''}</p>
-<p>Upstream revision <code>${manifest.revision}</code></p><p>${escape(JSON.stringify(summary))}</p>
+<p>Upstream revision <code>${manifest.revision}</code></p><p>${escape(JSON.stringify(summary))}</p>${forcedSummary ? `<p class="SKIP">Forced run: adapter guards were recorded instead of skipping. Results that ran past a guard: ${escape(JSON.stringify(forcedSummary))}. A forced PASS is not conformance evidence.</p>` : ''}
 <p>Color pre-pass: standard named colors are converted to equivalent RGB hex values in the test adapter. Upstream files and runtime are unchanged. Results do not test runtime color-name parsing; the JSON report records every converted declaration.</p>
 <p>HTML subset with explicit pointer actions for registered manual tests and pinned fonts and ASCII/degree text. Default serif uses upstream Gentium Plus. Basic paragraph defaults and block margin collapsing are exercised; font variants, other scripts, and further HTML/display modes remain unfinished. Both test and reference use Gea. These are subset results, not a claim of full CSS conformance. Magenta marks differing pixels. <a href="wpt-results.json">Machine-readable report and build provenance</a></p>
 <h2>CSS prerequisites</h2><p>These independent probes prevent shared test/reference bugs from producing false passes. The Ahem checks exercise native fonts, inheritance, shorthand, whitespace and font-relative sizing. A failed scoped probe blocks matching comparisons only when the test or a reference uses that CSS unit, property, pseudo-element, or HTML element; unequal images still fail. <a href="wpt-transport-control.png">Verified transport control (hexadecimal red)</a></p>${prerequisites.map(p => `<p class="${p.status}">${p.status} · <a href="${p.screenshot}">${p.name}</a>${p.cssUnit ? ` · applies to ${escape(p.cssUnit)} dependencies` : ''}${p.cssPseudo ? ` · applies to ${p.cssPseudo === 'hover' ? ':' : '::'}${escape(p.cssPseudo)} dependencies` : ''}${p.cssProperty ? ` · applies to ${escape(p.cssProperty)} declarations` : ''}${p.htmlTag ? ` · applies to &lt;${escape(p.htmlTag)}&gt; dependencies` : ''} · expected ${escape(JSON.stringify(p.expected))}, actual ${escape(JSON.stringify(p.actual))}</p>`).join('')}
-${results.map(r => `<article><h2 class="${r.status}">${r.status} · <a href="${upstream(r.test)}">${escape(path.basename(r.test))}</a></h2>${r.reason ? `<p>${escape(r.reason)}</p>` : ''}${r.interactions ? `<p>Automated interactions: <code>${escape(JSON.stringify(r.interactions))}</code></p>` : ''}${r.geometry ? `<p><a href="${r.geometry}">Actual node geometry</a></p>` : ''}${(r.comparisons || []).map(c => `<p>${escape(c.relation)} · ${c.totalPixels} differing pixels · maximum channel difference ${c.maxDifference} · <a href="${upstream(c.path)}">Upstream reference</a> · <a href="${c.geometry}">Reference geometry</a></p><section>${[['Actual', r.actual], ['Reference', c.reference], ['Difference', c.difference]].map(([label, src]) => `<figure><figcaption>${label}</figcaption><a href="${src}"><img src="${src}" alt="${label}"></a></figure>`).join('')}</section>`).join('')}</article>`).join('')}`);
+${results.map(r => `<article><h2 class="${r.status}">${r.status} · <a href="${upstream(r.test)}">${escape(path.basename(r.test))}</a></h2>${r.reason ? `<p>${escape(r.reason)}</p>` : ''}${r.forced ? `<p class="SKIP">Forced past: ${escape(r.forced.join('; '))}</p>` : ''}${r.interactions ? `<p>Automated interactions: <code>${escape(JSON.stringify(r.interactions))}</code></p>` : ''}${r.geometry ? `<p><a href="${r.geometry}">Actual node geometry</a></p>` : ''}${(r.comparisons || []).map(c => `<p>${escape(c.relation)} · ${c.totalPixels} differing pixels · maximum channel difference ${c.maxDifference} · <a href="${upstream(c.path)}">Upstream reference</a> · <a href="${c.geometry}">Reference geometry</a></p><section>${[['Actual', r.actual], ['Reference', c.reference], ['Difference', c.difference]].map(([label, src]) => `<figure><figcaption>${label}</figcaption><a href="${src}"><img src="${src}" alt="${label}"></a></figure>`).join('')}</section>`).join('')}</article>`).join('')}`);
 console.log(JSON.stringify(summary));
+if (forcedSummary) console.log(`forced ${JSON.stringify(forcedSummary)}`);
 console.log(`${out}/wpt-report.html`);
 process.exitCode = summary.ERROR ? 2 : summary.FAIL || summary.BLOCKED || invalidReferenceFoundation || !summary.PASS ? 1 : 0;
