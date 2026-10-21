@@ -80,6 +80,27 @@ EMSCRIPTEN_KEEPALIVE int wpt_init(int width, int height) {
   sheet.registerUserAgentElementRule("aside", "display", "block");
   sheet.registerUserAgentElementRule("article", "display", "block");
   sheet.registerUserAgentElementRule("strong", "font-weight", "bold");
+  // HTML's table rendering (HTML 15.3.8). Cells take the middle alignment
+  // their row group passes down by inheritance.
+  sheet.registerUserAgentElementRule("table", "display", "table");
+  sheet.registerUserAgentElementRule("table", "border-spacing", "2px");
+  sheet.registerUserAgentElementRule("table", "border-collapse", "separate");
+  sheet.registerUserAgentElementRule("table", "box-sizing", "border-box");
+  sheet.registerUserAgentElementRule("caption", "display", "table-caption");
+  sheet.registerUserAgentElementRule("caption", "text-align", "center");
+  sheet.registerUserAgentElementRule("thead", "display", "table-header-group");
+  sheet.registerUserAgentElementRule("tbody", "display", "table-row-group");
+  sheet.registerUserAgentElementRule("tfoot", "display", "table-footer-group");
+  sheet.registerUserAgentElementRule("tr", "display", "table-row");
+  sheet.registerUserAgentElementRule("col", "display", "table-column");
+  sheet.registerUserAgentElementRule("colgroup", "display", "table-column-group");
+  for (const char *cell : {"td", "th"}) {
+    sheet.registerUserAgentElementRule(cell, "display", "table-cell");
+    sheet.registerUserAgentElementRule(cell, "padding", "1px");
+    sheet.registerUserAgentElementRule(cell, "vertical-align", "middle");
+  }
+  sheet.registerUserAgentElementRule("th", "font-weight", "bold");
+  sheet.registerUserAgentElementRule("th", "text-align", "center");
   // Elements HTML does not define are HTMLUnknownElement: inline unless styled.
   for (const char *tag : {"flexbox", "grid", "container", "item"}) sheet.registerUserAgentElementRule(tag, "display", "inline");
   return 1;

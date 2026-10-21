@@ -2648,3 +2648,45 @@ reason now fail: `inline-svg-100-percent-in-body` (its SVG is still dropped) and
 `background-image-cover-zoomed-1` (its reference's `body > div` rule is not
 transported). Image layers are not clipped to rounded corners, do not blend,
 and are not painted on transformed boxes.
+
+## Table layout (2026-10-22)
+
+The adapter accepts `table`, `caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`,
+`th`, `col` and `colgroup`, and the `table` and `table-*` display values except
+`inline-table`. The bridge registers HTML's table rendering as UA rules:
+`border-spacing: 2px`, cell padding of 1px and middle alignment, bold centered
+`th`. The parser has already inserted the implied `tbody` and `tr`. Table
+attributes (`cellspacing`, `cellpadding`, `colspan`, `rowspan`, `border`, ...)
+remain unsupported.
+
+The engine lays tables out (`GEA_CSS_TABLES`, CSS 2.2 section 17):
+
+- Row groups are placed header first, then bodies and rows in document order,
+  then footers. Cells directly in a table or row group form an anonymous row,
+  and any other box among cells is laid out as its own anonymous cell.
+- Columns take automatic widths (17.5.2.2) from their cells' min- and
+  max-content widths, measured as if the cell width were auto; a specified
+  cell width raises the maximum. A table with an auto width shrinks to fit,
+  and block or flex-column parents do not stretch it.
+- Rows take their tallest cell or their specified height. Cells stretch to
+  their row and align their content top, middle or bottom (baseline aligns as
+  top). Row groups and rows span the columns.
+- `border-spacing` separates cells; `border-collapse: collapse` removes the
+  spacing but does not resolve border conflicts.
+- Tables and cells establish block formatting contexts, so floats reach no
+  table part. Multicolumn properties do not apply to a table.
+- A relative offset on a table part resolves a percentage against its parent's
+  specified height, and against 0 when that height is auto.
+
+The complete forced run moves from **920 PASS, 180 FAIL** to **940 PASS, 160 FAIL**
+with no regressions: all 16 `position-relative` table tests, `s-11-1-1b-007`,
+`floated-table-wider-than-specified`, `background-multiple-layers-table-cell`
+and `background-color-animation-with-table4` (forced). `clip-text-descendants`
+now passes unforced.
+
+Not implemented: captions are placed above the rows inside the table box (CSS
+puts them outside it), `caption-side`, `inline-table`, `colspan` and `rowspan`,
+collapsed border conflict resolution, column and column group backgrounds and
+borders, baseline alignment in cells, distributing a table's extra height over
+its rows, `overflow` other than `hidden` on tables, and placing a table beside
+floats by its minimum width.

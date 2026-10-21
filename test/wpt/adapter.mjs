@@ -109,7 +109,7 @@ export function parseDocument(source, name, { readResource, force = false } = {}
         unsupported(error.message);
       }
       if (n.important) unsupported('!important needs priority-preserving declaration transport');
-      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none|flow-root|list-item|inline|inline-block|inline-flex|inline-grid)$/i.test(n.value)) unsupported('Only block/flex/grid/none/flow-root/list-item/inline/inline-block/inline-flex/inline-grid display declarations are supported by this adapter');
+      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none|flow-root|list-item|inline|inline-block|inline-flex|inline-grid|table|table-(row-group|header-group|footer-group|row|cell|caption|column|column-group))$/i.test(n.value)) unsupported('Only block/flex/grid/none/flow-root/list-item/inline/inline-block/inline-flex/inline-grid/table display declarations are supported by this adapter');
       if (n.prop.toLowerCase() === 'content') unsupported('Generated text content');
       if (/^(animation|transition)(-|$)/i.test(n.prop)) unsupported('Animation/transition timing is not implemented by this static adapter');
       properties.add(n.prop);
@@ -216,7 +216,7 @@ export function parseDocument(source, name, { readResource, force = false } = {}
     if (n.tagName === 'head') return null;
     // These never generate boxes; inspect() already applied what they carry.
     if (force && ['script', 'style', 'template', 'title', 'meta', 'link', 'base', 'noscript'].includes(n.tagName)) return null;
-    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br', 'strong', 'aside', 'article', 'img', 'flexbox', 'grid', 'container', 'item'].includes(n.tagName)) unsupported(`HTML element <${n.tagName}>`);
+    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br', 'strong', 'aside', 'article', 'img', 'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'col', 'colgroup', 'flexbox', 'grid', 'container', 'item'].includes(n.tagName)) unsupported(`HTML element <${n.tagName}>`);
     if (n.namespaceURI !== 'http://www.w3.org/1999/xhtml') unsupported('Non-HTML namespace');
     if (++count > 450) unsupported('Document exceeds adapter node limit');
     const attributes = [], inline = [];
