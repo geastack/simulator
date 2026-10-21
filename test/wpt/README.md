@@ -2568,3 +2568,46 @@ failing vertical writing-mode cases and two forced line-clamp cases (seams
 removed); their statuses do not. The 24 vertical `css-position` failures
 need vertical inline layout, writing-mode-aware logical properties and vertical
 multicolumn fragmentation, which the engine does not implement.
+
+## Vertical writing-mode flows and flow-relative properties (2026-10-21)
+
+The engine now lays out vertical inline content. A `vertical-lr` or
+`vertical-rl` block container with inline content or columns, whose subtree
+holds only elements and text in that one writing mode, becomes a vertical flow.
+Its subtree is rotated into the logical frame (boxes, sizes, sides, insets and
+auto margins), laid out by the horizontal block, inline and multicolumn code,
+and transposed back. Its text draws as columns of glyphs turned clockwise.
+Absolute boxes whose containing block lies in the flow are placed in the logical
+frame. Columns stack across the block axis. Flex and grid containers, line
+clamps, replaced content and mixed writing modes keep the previous path.
+
+Flow-relative properties in stylesheet rules (`inset-inline-start`,
+`margin-block-end`, `inline-size`, ...) now map by each element's own writing
+mode and direction ([CSS Logical 4](https://drafts.csswg.org/css-logical-1/#box)),
+not always as horizontal-tb ltr. Inline styles and the compiler's static
+mapping still use horizontal-tb ltr.
+
+Horizontal corrections the same tests needed:
+
+- An absolute box's static position moves with a relatively positioned inline
+  ancestor.
+- A split inline's containing block rectangle covers its child inlines'
+  fragments, and in right-to-left text uses the block's direction.
+- Collapsible spaces that end a line hang past it instead of wrapping the run
+  before them.
+- A word that continues across inline items is not split between lines.
+- `text-align: start` and `end` resolve with the block's direction.
+- An orthogonal inline-block takes a synthesized baseline.
+- An absolute vertical box with both vertical insets lays out its lines at that
+  height.
+- Bitmap-font text that wraps takes the bottom of its first line box as its
+  baseline, not its last, so the items beside its first line stay on it.
+
+A relayout scoped to a subtree inside a vertical flow starts from the flow's
+root, the only place the flow can be laid out from.
+
+The complete forced run moves from **874 PASS, 226 FAIL** to **900 PASS, 200 FAIL**
+with no regressions. All 24 vertical `css-position` tests pass, as do
+`align-self-static-position-004` and `margin-trim/flex-column-orthogonal-item`.
+Vertical text draws no decorations, emphasis marks or ellipses. There is no bidi
+reordering, and margins do not collapse through a vertical flow root.
