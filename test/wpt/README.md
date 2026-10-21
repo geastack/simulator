@@ -2532,3 +2532,39 @@ The native text-coverage parity, text-background integration, first-line, and
 transformed-rounded-rect suites pass. The adapter/font suite has 20 passing
 checks. Work stops here at the user's request; remaining failures are preserved
 for a later session.
+
+## Ahem without antialiasing and right-to-left static positions (2026-10-21)
+
+The bridge now asks the engine to rasterize Ahem without antialiasing, as
+browser reftest harnesses do (Gecko's `gfx.font_rendering.ahem_antialias_none`).
+Ahem's ascent is 0.8em, so at sizes that are not multiples of 5px its square
+glyphs start between pixel rows: at 16px the antialiased glyph covered 80% of
+its top row and 20% of the row below its line box, enough to show a red span
+beneath it or tint an adjacent border. The engine still owns all metrics and
+coverage; `generated::runtimeTtfFontAntialiased` (weak, true by default) only
+thresholds the family's coverage at 50% when each glyph is rasterized. Other
+fonts, including the Gentium Plus default whose `gasp` table also requests no
+grayscale at 9-16ppem, keep antialiasing.
+
+Three shared-engine corrections accompany it:
+
+- A block-level absolute box placed after content on its line takes its static
+  position on the next line at its block's inline-start edge, the right edge in
+  a right-to-left block (CSS 2.2 10.3.7).
+- An inline box whose content fits one line no longer applies `text-align`
+  inside itself; the line that holds it aligns it as a whole. A `direction: rtl`
+  span in a left-to-right line had moved its content across the line.
+- A contentless inline box on a line (nothing in flow, nothing painted, no
+  authored size) takes its font's content area, so a positioned one gives its
+  absolute children the right containing block. It still adds no height to its
+  line, and on a zero-height line (CSS 2.2 9.4.2) it stays at the line's top. As
+  a flex or grid item it is blockified and stays empty.
+
+The complete forced run moves from **869 PASS, 231 FAIL** to **874 PASS, 226 FAIL**
+with no regressions: `htb-ltr-ltr`, `htb-ltr-rtl.tentative`,
+`htb-rtl-ltr.tentative`, `htb-rtl-rtl` and
+`nested-inline-abspos-child-with-siblings` pass. Pixel counts change in 14
+failing vertical writing-mode cases and two forced line-clamp cases (seams
+removed); their statuses do not. The 24 vertical `css-position` failures
+need vertical inline layout, writing-mode-aware logical properties and vertical
+multicolumn fragmentation, which the engine does not implement.

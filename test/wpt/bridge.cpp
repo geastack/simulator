@@ -41,6 +41,12 @@ const std::uint8_t *lookupRuntimeTtfFontForFamily(int id, unsigned long *length)
   if (length) *length = bytes.size();
   return bytes.data();
 }
+// Browser reftest harnesses draw Ahem without antialiasing (Gecko's
+// gfx.font_rendering.ahem_antialias_none), so its 0.8em ascent leaves no
+// partial rows at sizes such as 16px.
+bool runtimeTtfFontAntialiased(int id) {
+  return id < 0 || static_cast<std::size_t>(id) >= testFonts.size() || testFonts[id].family != "ahem";
+}
 }
 namespace gea::framework::app::generated { void drainMicrotasks() {} }
 using namespace gea::embedded::ui;
