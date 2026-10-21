@@ -66,8 +66,11 @@ function fontBytes(font) {
 for (const name of Object.keys(manifest.files)) readBytes(name);
 function render(document, actions = []) {
   const fonts = (document.fonts || []).map(font => ({ family: font.family, bytes: sfntFont(fontBytes(font)).toString('base64') }));
+  // An image the importer could not fetch stays a failed load, as in a browser.
+  const images = (document.images || []).filter(name => !Object.hasOwn(manifest.missingResources || {}, name))
+    .map(name => ({ path: name, bytes: readBytes(name).toString('base64') }));
   const r = spawnSync(process.execPath, [`${root}/render.mjs`], {
-    input: JSON.stringify({ document, viewport: manifest.viewport, fonts, interactions: actions }),
+    input: JSON.stringify({ document, viewport: manifest.viewport, fonts, images, interactions: actions }),
     encoding: 'utf8', timeout: 30000, maxBuffer: 16 * 1024 * 1024,
   });
   if (r.error || r.status !== 0) throw new Error(`Renderer failed: ${r.error?.message || `exit ${r.status}, signal ${r.signal}`}\n${r.stderr || '(no worker diagnostics)'}`);

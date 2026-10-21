@@ -2611,3 +2611,40 @@ with no regressions. All 24 vertical `css-position` tests pass, as do
 `align-self-static-position-004` and `margin-trim/flex-column-orthogonal-item`.
 Vertical text draws no decorations, emphasis marks or ellipses. There is no bidi
 reordering, and margins do not collapse through a vertical flow root.
+
+## url() background images and image sizing (2026-10-21)
+
+The rig now loads pinned PNG, JPEG and GIF files. The adapter rewrites each
+`url()` in `background` and `background-image` to the image's path from the WPT
+root, and accepts `<img src>` and `flags=image` metadata. `run.mjs` sends the
+bytes with the document (an image the importer could not fetch stays a failed
+load, as in a browser), and `bridge.cpp` serves them through the weak
+`gea_embedded_asset_lookup`, the same table an app's embedded assets use. Other
+`url()` values (cursor, list-style-image, masks, border-image) and other image
+formats (SVG) stay unsupported.
+
+The engine paints `url()` background layers (`GEA_CSS_BACKGROUND_IMAGES`, on
+when `GEA_CSS_BACKGROUND_LAYERS` is): each layer resolves its image once when
+the style is applied, sizes it by its natural size, `contain`, `cover` or a
+length with the other side following the ratio, and records one blit per tile
+inside the painting area. Tiles clip to their own bounds, so the dirty-region
+replays that skip clip commands cannot paint a tile past the layer. The
+stylesheet holds a reference to each image until its compiled backgrounds are
+cleared.
+
+Images also size by their natural aspect ratio now: a given width or height
+sets the other side, a stretched flex item takes its main size through it, and
+a block-level image keeps its natural width instead of filling its container
+(CSS 2.2 10.3.2 and 10.3.4).
+
+The complete forced run moves from **900 PASS, 200 FAIL** to **920 PASS, 180 FAIL**.
+Newly passing (22): `background-image-001` to `006`, `background-origin-002` to
+`006` and `008`, seven `clip-border-area-*` tests,
+`clip-text-multiline-background-image`, `background-image-table-cells-zoomed` and
+`aspect-ratio-intrinsic-size-006`. The seven `grid-abspos-staticpos-*-img-*`
+tests passed forced only because the adapter dropped every image; they now
+render their images and pass unforced. Two forced tests that passed for the same
+reason now fail: `inline-svg-100-percent-in-body` (its SVG is still dropped) and
+`background-image-cover-zoomed-1` (its reference's `body > div` rule is not
+transported). Image layers are not clipped to rounded corners, do not blend,
+and are not painted on transformed boxes.

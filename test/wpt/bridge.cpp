@@ -12,12 +12,17 @@
 #include "graphics/font.h"
 #include <string>
 #include <vector>
+#include <memory>
 #include <algorithm>
 #include <cctype>
 
 namespace {
 struct TestFont { std::string family; std::vector<std::uint8_t> bytes; };
 std::vector<TestFont> testFonts;
+// Pinned images by their path from the WPT root. The engine caches decoded
+// images by byte pointer, so every buffer keeps its address once added.
+struct TestImage { std::string path; std::unique_ptr<std::vector<std::uint8_t>> bytes; };
+std::vector<TestImage> testImages;
 std::string fontKey(const char *name) {
   std::string key(name ? name : "");
   std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -49,6 +54,17 @@ bool runtimeTtfFontAntialiased(int id) {
 }
 }
 namespace gea::framework::app::generated { void drainMicrotasks() {} }
+// The host resolves an image path (url(), src) through the asset table an app
+// build generates; the rig's table is the document's pinned images.
+extern "C" bool gea_embedded_asset_lookup(const char *path, const unsigned char **data, unsigned long *length) {
+  for (const auto &image : testImages)
+    if (path && image.path == path) {
+      *data = image.bytes->data();
+      *length = image.bytes->size();
+      return true;
+    }
+  return false;
+}
 using namespace gea::embedded::ui;
 
 extern "C" {
@@ -77,6 +93,11 @@ EMSCRIPTEN_KEEPALIVE int wpt_font(const char *family, const std::uint8_t *bytes,
   testFonts.push_back({fontKey(family), {bytes, bytes + length}});
   if (!FontRegistry::rasterizedFamily(id, 20).valid()) return -1;
   return id;
+}
+EMSCRIPTEN_KEEPALIVE int wpt_image(const char *path, const std::uint8_t *bytes, int length) {
+  if (!path || !*path || !bytes || length <= 0) return -1;
+  testImages.push_back({path, std::make_unique<std::vector<std::uint8_t>>(bytes, bytes + length)});
+  return static_cast<int>(testImages.size()) - 1;
 }
 EMSCRIPTEN_KEEPALIVE int wpt_text(const char *text, int parent) {
   auto node = Document::instance().createText(text);
