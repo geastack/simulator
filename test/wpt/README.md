@@ -2714,3 +2714,27 @@ with no regressions: `float-in-inline-001` and `-002`,
 `intrinsic-size-float-and-line`, `new-fc-separates-from-float` and `-2`,
 `table-sizing-with-adjacent-floats` and `zero-width-floats` pass.
 `new-fc-relayout` still fails: `line-height: 0` is stored as `normal`.
+
+## Block-level justify-self, lines beside floats, zero scale (2026-10-22)
+
+Four shared-engine changes:
+
+- `justify-self` places a block-level box in its block container's free inline
+  space (CSS Align 3, 6.1); `auto` takes the container's `justify-items`. The
+  static position of an absolutely positioned box takes the container's
+  `justify-items` too; `align-items` does not reach block-level boxes, so it
+  does not reach the block axis of the static position.
+- A block of inline content whose top a float reaches has its lines placed in
+  the enclosing float context, shortened by the floats beside them (CSS 2.2
+  9.5). Before, only inline content directly in the context avoided floats.
+- An inline-block whose lines are clamped puts its baseline on the last kept
+  line.
+- A box with a zero scale renders nothing, with its subtree. A zero z scale
+  hides only a box outside a 3D rendering context, so the `transform-scale-z`
+  control (a preserve-3d box under a perspective parent) keeps painting.
+
+The complete forced run moves from **947 PASS, 153 FAIL** to **950 PASS, 150 FAIL**
+with no regressions: `align-items-static-position-001`, `line-clamp-015` and
+`individual-transform-3` pass. `block-justify-self` goes from 21600 to 2400
+differing pixels; its last red row is an absolutely positioned 100px box whose
+"absolute parent" wraps to two lines in the rig's font and to one in Chrome's.
