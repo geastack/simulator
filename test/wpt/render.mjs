@@ -10,7 +10,7 @@ trace('reading-input');
 // Large pinned fonts travel over a pipe. Drain it through libuv instead of a
 // synchronous fd read: intermittent macOS stalls were traced to that read,
 // before WASM initialization. Keep the parent's timeout and error reporting.
-const { document, viewport, fonts = [], interactions = [] } = JSON.parse(await readText(process.stdin));
+const { document, viewport, fonts = [], images = [], interactions = [] } = JSON.parse(await readText(process.stdin));
 trace('initializing-wasm');
 const module = await createRenderer({ print: console.error, printErr: console.error });
 trace('wasm-ready');
@@ -24,6 +24,17 @@ for (const font of fonts) {
     module.HEAPU8.set(bytes, pointer);
     if (call('font', 'number', ['string', 'number', 'number'], [font.family, pointer, bytes.length]) < 0)
       throw new Error(`Font loading failed: ${font.family}`);
+  } finally { module._free(pointer); }
+}
+// Pinned images by the path url() and src name them; the engine decodes them.
+for (const image of images) {
+  const bytes = Buffer.from(image.bytes, 'base64');
+  const pointer = module._malloc(bytes.length);
+  if (!pointer) throw new Error('Image allocation failed');
+  try {
+    module.HEAPU8.set(bytes, pointer);
+    if (call('image', 'number', ['string', 'number', 'number'], [image.path, pointer, bytes.length]) < 0)
+      throw new Error(`Image loading failed: ${image.path}`);
   } finally { module._free(pointer); }
 }
 const nodes = [];

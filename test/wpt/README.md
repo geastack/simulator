@@ -152,16 +152,18 @@ unrelated failed unit probe does not block that comparison.
 
 ## Current adapter scope
 
-* Standards-mode HTML, `html`/`body`/`div`/`span`/`section`, IDs/classes, inline
-  declarations, embedded and linked stylesheets. ASCII/degree text and all
+* Standards-mode HTML, `html`/`body`/`div`/`span`/`section`/`strong`/`aside`/`article`,
+  the unknown elements `flexbox`/`grid`/`container`/`item`, IDs/classes, inline
+  declarations, embedded and linked stylesheets. ASCII, degree and ellipsis (U+2026) text and all
   source whitespace are transported to the native layout engine. Comments do
   not interrupt a contiguous CSS text sequence.
 * 800 × 600 CSS pixels, DPR 1: the WPT viewport, not the physical board viewport.
   Pixel storage and rasterization use the simulator's embedded RGB565 path.
 * HTML body margins and root text color are installed at Gea's default-style
   priority, below author styles. The display list paints onto a white viewport.
-  Paragraph display and `1em` block margins are registered as UA element rules
-  by the test bridge. The shared cascade keeps them below author rules,
+  Paragraph display and `1em` block margins, bold `strong`, and inline display
+  for the unknown elements (HTML makes them `HTMLUnknownElement`) are registered
+  as UA element rules by the test bridge. The shared cascade keeps them below author rules,
   including universal selectors; the engine does not install HTML defaults.
   Selector lists are split for the native one-selector-per-rule API. Simple
   element/class selectors use their corresponding native registration APIs.
@@ -179,10 +181,15 @@ unrelated failed unit probe does not block that comparison.
   a fresh tree and an initial layout/paint. This first version has no animation
   or mutation lifecycle and does not exercise the TSX compiler/app loader.
 * Scripts, further HTML defaults and display modes, text outside
-  the native ASCII/degree repertoire, XHTML, image assets,
+  the ASCII/degree/ellipsis repertoire, XHTML, image assets,
   at-rules other than basic TrueType/WOFF1 `@font-face`, `!important`, quirks mode, compound HTML/body selectors and unsupported
   HTML are explicit skips.
   These are adapter limitations, not evidence that the engine cannot support them.
+* `display` declarations are transported for `block`, `flex`, `grid`, `none`,
+  `flow-root`, `list-item`, `inline`, `inline-block`, `inline-flex` and
+  `inline-grid`; any other value is
+  a skip. Whatever the engine does not implement for these values (such as
+  list markers) shows up as a failure, not a skip.
 * Apart from that disclosed color normalization, CSS properties and values are
   sent unchanged to the engine. The imported corpus includes
   interactions with features such as floats, flex-flow and order. A failure
@@ -386,6 +393,10 @@ The default serif font is pinned upstream Gentium Plus. Its WOFF1 wrapper is
 decoded losslessly into SFNT tables, with bounds and checksums validated.
 Independent tests compare every decoded table with its source and verify the
 complete SFNT checksum. Pinned Ahem is also available as an installed test font.
+Documents that name the generic `monospace` family also load DejaVu Sans Mono
+2.35 from `test/wpt/fonts`, the rig's own font directory (upstream WPT pins no
+monospace font). It is unmodified, pinned by SHA-256 in `fonts.mjs`, and
+distributed under the Bitstream Vera license in `fonts/LICENSE-DejaVu.txt`.
 Font variants, general font matching/shaping, paragraph defaults, additional
 display modes and other character repertoires still need work.
 
@@ -2521,3 +2532,257 @@ The native text-coverage parity, text-background integration, first-line, and
 transformed-rounded-rect suites pass. The adapter/font suite has 20 passing
 checks. Work stops here at the user's request; remaining failures are preserved
 for a later session.
+
+## Ahem without antialiasing and right-to-left static positions (2026-10-21)
+
+The bridge now asks the engine to rasterize Ahem without antialiasing, as
+browser reftest harnesses do (Gecko's `gfx.font_rendering.ahem_antialias_none`).
+Ahem's ascent is 0.8em, so at sizes that are not multiples of 5px its square
+glyphs start between pixel rows: at 16px the antialiased glyph covered 80% of
+its top row and 20% of the row below its line box, enough to show a red span
+beneath it or tint an adjacent border. The engine still owns all metrics and
+coverage; `generated::runtimeTtfFontAntialiased` (weak, true by default) only
+thresholds the family's coverage at 50% when each glyph is rasterized. Other
+fonts, including the Gentium Plus default whose `gasp` table also requests no
+grayscale at 9-16ppem, keep antialiasing.
+
+Three shared-engine corrections accompany it:
+
+- A block-level absolute box placed after content on its line takes its static
+  position on the next line at its block's inline-start edge, the right edge in
+  a right-to-left block (CSS 2.2 10.3.7).
+- An inline box whose content fits one line no longer applies `text-align`
+  inside itself; the line that holds it aligns it as a whole. A `direction: rtl`
+  span in a left-to-right line had moved its content across the line.
+- A contentless inline box on a line (nothing in flow, nothing painted, no
+  authored size) takes its font's content area, so a positioned one gives its
+  absolute children the right containing block. It still adds no height to its
+  line, and on a zero-height line (CSS 2.2 9.4.2) it stays at the line's top. As
+  a flex or grid item it is blockified and stays empty.
+
+The complete forced run moves from **869 PASS, 231 FAIL** to **874 PASS, 226 FAIL**
+with no regressions: `htb-ltr-ltr`, `htb-ltr-rtl.tentative`,
+`htb-rtl-ltr.tentative`, `htb-rtl-rtl` and
+`nested-inline-abspos-child-with-siblings` pass. Pixel counts change in 14
+failing vertical writing-mode cases and two forced line-clamp cases (seams
+removed); their statuses do not. The 24 vertical `css-position` failures
+need vertical inline layout, writing-mode-aware logical properties and vertical
+multicolumn fragmentation, which the engine does not implement.
+
+## Vertical writing-mode flows and flow-relative properties (2026-10-21)
+
+The engine now lays out vertical inline content. A `vertical-lr` or
+`vertical-rl` block container with inline content or columns, whose subtree
+holds only elements and text in that one writing mode, becomes a vertical flow.
+Its subtree is rotated into the logical frame (boxes, sizes, sides, insets and
+auto margins), laid out by the horizontal block, inline and multicolumn code,
+and transposed back. Its text draws as columns of glyphs turned clockwise.
+Absolute boxes whose containing block lies in the flow are placed in the logical
+frame. Columns stack across the block axis. Flex and grid containers, line
+clamps, replaced content and mixed writing modes keep the previous path.
+
+Flow-relative properties in stylesheet rules (`inset-inline-start`,
+`margin-block-end`, `inline-size`, ...) now map by each element's own writing
+mode and direction ([CSS Logical 4](https://drafts.csswg.org/css-logical-1/#box)),
+not always as horizontal-tb ltr. Inline styles and the compiler's static
+mapping still use horizontal-tb ltr.
+
+Horizontal corrections the same tests needed:
+
+- An absolute box's static position moves with a relatively positioned inline
+  ancestor.
+- A split inline's containing block rectangle covers its child inlines'
+  fragments, and in right-to-left text uses the block's direction.
+- Collapsible spaces that end a line hang past it instead of wrapping the run
+  before them.
+- A word that continues across inline items is not split between lines.
+- `text-align: start` and `end` resolve with the block's direction.
+- An orthogonal inline-block takes a synthesized baseline.
+- An absolute vertical box with both vertical insets lays out its lines at that
+  height.
+- Bitmap-font text that wraps takes the bottom of its first line box as its
+  baseline, not its last, so the items beside its first line stay on it.
+
+A relayout scoped to a subtree inside a vertical flow starts from the flow's
+root, the only place the flow can be laid out from.
+
+The complete forced run moves from **874 PASS, 226 FAIL** to **900 PASS, 200 FAIL**
+with no regressions. All 24 vertical `css-position` tests pass, as do
+`align-self-static-position-004` and `margin-trim/flex-column-orthogonal-item`.
+Vertical text draws no decorations, emphasis marks or ellipses. There is no bidi
+reordering, and margins do not collapse through a vertical flow root.
+
+## url() background images and image sizing (2026-10-21)
+
+The rig now loads pinned PNG, JPEG and GIF files. The adapter rewrites each
+`url()` in `background` and `background-image` to the image's path from the WPT
+root, and accepts `<img src>` and `flags=image` metadata. `run.mjs` sends the
+bytes with the document (an image the importer could not fetch stays a failed
+load, as in a browser), and `bridge.cpp` serves them through the weak
+`gea_embedded_asset_lookup`, the same table an app's embedded assets use. Other
+`url()` values (cursor, list-style-image, masks, border-image) and other image
+formats (SVG) stay unsupported.
+
+The engine paints `url()` background layers (`GEA_CSS_BACKGROUND_IMAGES`, on
+when `GEA_CSS_BACKGROUND_LAYERS` is): each layer resolves its image once when
+the style is applied, sizes it by its natural size, `contain`, `cover` or a
+length with the other side following the ratio, and records one blit per tile
+inside the painting area. Tiles clip to their own bounds, so the dirty-region
+replays that skip clip commands cannot paint a tile past the layer. The
+stylesheet holds a reference to each image until its compiled backgrounds are
+cleared.
+
+Images also size by their natural aspect ratio now: a given width or height
+sets the other side, a stretched flex item takes its main size through it, and
+a block-level image keeps its natural width instead of filling its container
+(CSS 2.2 10.3.2 and 10.3.4).
+
+The complete forced run moves from **900 PASS, 200 FAIL** to **920 PASS, 180 FAIL**.
+Newly passing (22): `background-image-001` to `006`, `background-origin-002` to
+`006` and `008`, seven `clip-border-area-*` tests,
+`clip-text-multiline-background-image`, `background-image-table-cells-zoomed` and
+`aspect-ratio-intrinsic-size-006`. The seven `grid-abspos-staticpos-*-img-*`
+tests passed forced only because the adapter dropped every image; they now
+render their images and pass unforced. Two forced tests that passed for the same
+reason now fail: `inline-svg-100-percent-in-body` (its SVG is still dropped) and
+`background-image-cover-zoomed-1` (its reference's `body > div` rule is not
+transported). Image layers are not clipped to rounded corners, do not blend,
+and are not painted on transformed boxes.
+
+## Table layout (2026-10-22)
+
+The adapter accepts `table`, `caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`,
+`th`, `col` and `colgroup`, and the `table` and `table-*` display values except
+`inline-table`. The bridge registers HTML's table rendering as UA rules:
+`border-spacing: 2px`, cell padding of 1px and middle alignment, bold centered
+`th`. The parser has already inserted the implied `tbody` and `tr`. Table
+attributes (`cellspacing`, `cellpadding`, `colspan`, `rowspan`, `border`, ...)
+remain unsupported.
+
+The engine lays tables out (`GEA_CSS_TABLES`, CSS 2.2 section 17):
+
+- Row groups are placed header first, then bodies and rows in document order,
+  then footers. Cells directly in a table or row group form an anonymous row,
+  and any other box among cells is laid out as its own anonymous cell.
+- Columns take automatic widths (17.5.2.2) from their cells' min- and
+  max-content widths, measured as if the cell width were auto; a specified
+  cell width raises the maximum. A table with an auto width shrinks to fit,
+  and block or flex-column parents do not stretch it.
+- Rows take their tallest cell or their specified height. Cells stretch to
+  their row and align their content top, middle or bottom (baseline aligns as
+  top). Row groups and rows span the columns.
+- `border-spacing` separates cells; `border-collapse: collapse` removes the
+  spacing but does not resolve border conflicts.
+- Tables and cells establish block formatting contexts, so floats reach no
+  table part. Multicolumn properties do not apply to a table.
+- A relative offset on a table part resolves a percentage against its parent's
+  specified height, and against 0 when that height is auto.
+
+The complete forced run moves from **920 PASS, 180 FAIL** to **940 PASS, 160 FAIL**
+with no regressions: all 16 `position-relative` table tests, `s-11-1-1b-007`,
+`floated-table-wider-than-specified`, `background-multiple-layers-table-cell`
+and `background-color-animation-with-table4` (forced). `clip-text-descendants`
+now passes unforced.
+
+Not implemented: captions are placed above the rows inside the table box (CSS
+puts them outside it), `caption-side`, `inline-table`, `colspan` and `rowspan`,
+collapsed border conflict resolution, column and column group backgrounds and
+borders, baseline alignment in cells, distributing a table's extra height over
+its rows, `overflow` other than `hidden` on tables, and placing a table beside
+floats by its minimum width.
+
+## Floats beside formatting contexts (2026-10-22)
+
+Five placements in the shared engine's float context now follow browsers:
+
+- A block formatting context that settles the hypothetical top of a wrapper
+  (its margin collapses through empty siblings into the wrapper's top, CSS 2.2
+  8.3.1) is first tried before its own margin, with the floats placed at that
+  top beside it. When they push it down, its margin is dropped like clearance
+  and the wrapper keeps the top without it; when it fits there, the margin
+  adjoins as before. This is LayoutNG's rule, checked in Chrome.
+- A float whose margin box has no area excludes nothing from a formatting
+  context, and beside a float a negative inline margin counts as zero.
+- A table with an automatic width shrinks to fit the opportunity beside floats.
+- A float inside a decorated inline box (padding, border or margin) is hoisted
+  to the enclosing block's float context; the inline box flows its other
+  content.
+- Floats beside an inline run add their width to the block's max-content size.
+
+The complete forced run moves from **940 PASS, 160 FAIL** to **947 PASS, 153 FAIL**
+with no regressions: `float-in-inline-001` and `-002`,
+`intrinsic-size-float-and-line`, `new-fc-separates-from-float` and `-2`,
+`table-sizing-with-adjacent-floats` and `zero-width-floats` pass.
+`new-fc-relayout` still fails: `line-height: 0` is stored as `normal`.
+
+## Block-level justify-self, lines beside floats, zero scale (2026-10-22)
+
+Four shared-engine changes:
+
+- `justify-self` places a block-level box in its block container's free inline
+  space (CSS Align 3, 6.1); `auto` takes the container's `justify-items`. The
+  static position of an absolutely positioned box takes the container's
+  `justify-items` too; `align-items` does not reach block-level boxes, so it
+  does not reach the block axis of the static position.
+- A block of inline content whose top a float reaches has its lines placed in
+  the enclosing float context, shortened by the floats beside them (CSS 2.2
+  9.5). Before, only inline content directly in the context avoided floats.
+- An inline-block whose lines are clamped puts its baseline on the last kept
+  line.
+- A box with a zero scale renders nothing, with its subtree. A zero z scale
+  hides only a box outside a 3D rendering context, so the `transform-scale-z`
+  control (a preserve-3d box under a perspective parent) keeps painting.
+
+The complete forced run moves from **947 PASS, 153 FAIL** to **950 PASS, 150 FAIL**
+with no regressions: `align-items-static-position-001`, `line-clamp-015` and
+`individual-transform-3` pass. `block-justify-self` goes from 21600 to 2400
+differing pixels; its last red row is an absolutely positioned 100px box whose
+"absolute parent" wraps to two lines in the rig's font and to one in Chrome's.
+
+## Replaced-box sizing, stretch, grid baselines, background shorthands (2026-10-22)
+
+Four shared-engine changes:
+
+- A flex item that is an image takes its min-content size as its content
+  size suggestion (CSS Flexbox 4.5): its natural size in the main axis, or
+  the size a definite cross size transfers through its ratio. An image's
+  `width: min-content`, `max-content` or `fit-content` with a definite height
+  is the transferred width (CSS Sizing 4, 5.2.1); the natural width no longer
+  overrides what the pass measured. A replaced box displayed as a block is a
+  block-level box of its container: its margins collapse with its siblings'
+  and `margin-trim` reaches them (CSS 2.2 9.2.1, 8.3.1).
+- `width: stretch` and `height: stretch` (CSS Sizing 4, 5.1.1): an absolutely
+  positioned box fills its inset-modified containing block, as it does with
+  both insets set; a block child fills a definite container height less its
+  margins.
+- Grid items aligned by first baseline that start in the same row share the
+  row's baseline (CSS Align 3, 9.1); each sits lower by its shim, which also
+  grows an auto row. Before, baseline fell back to start.
+- The `background` shorthand sets the placement longhands its layers carry
+  (position, size, repeat, attachment, origin); before, `url(x) no-repeat
+  center` tiled from the padding corner. An image tile covering the whole
+  painting area of a box with rounded corners is cut to them.
+
+The complete forced run moves from **950 PASS, 150 FAIL** to **960 PASS, 140 FAIL**
+with no regressions: `flex-aspect-ratio-055`, `intrinsic-size-017`, `-018` and
+`-019`, margin-trim's `block-container-replaced-block`, `-block-start` and
+`-block-end`, `abspos-stretch-replaced-percentage-child`,
+`grid-align-baseline-explicit-placement` and
+`background-image-centered-with-border-radius` pass.
+
+## Hidden back faces as containing blocks (2026-10-22)
+
+One shared-engine change: a box with `backface-visibility: hidden` whose
+parent preserves 3D is a containing block for its positioned descendants and
+a stacking context, as browsers make it. The complete forced run moves from
+**960 PASS, 140 FAIL** to **961 PASS, 139 FAIL** with no regressions:
+`backface-visibility-hidden-003` passes.
+
+Of the other four cheap-looking failures, none is a few lines:
+`block-ellipsis-039` and `line-clamp-auto-041` share one cause, the line the
+ellipsis empties keeps the height of the inline boxes it removed, which needs
+the clamp walk to measure the ellipsis and lay the line out again;
+`grid-trim-ignores-collapsed-tracks` needs `repeat(auto-fit, …)` tracks that
+collapse when empty; `3d-rendering-context-and-inline` needs flattening at
+every `transform-style: flat` ancestor in the projection chain, which the
+engine does not do for any ancestor.

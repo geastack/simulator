@@ -16,7 +16,10 @@ for (const [key, pkg] of Object.entries({ GEA_CORE: 'core', GEA_HOST_DIR: 'host'
 }
 const manifest = await import(pathToFileURL(path.join(env.GEA_CORE, 'gea_sources.mjs')));
 const includes = [...manifest.includeFlags(env), `-I${root}/targets/web/include`];
-const sources = [...manifest.cSources(env), ...manifest.cxxSources(env),
+// audio_buffer_runtime.cpp defines compiler-declared AudioBuffer methods against
+// an app's generated gea_runtime.h. The rig compiles no app and calls none of them.
+const appSensitive = s => !env.GEA_COMPILER_RUNTIME && path.basename(s) === 'audio_buffer_runtime.cpp';
+const sources = [...manifest.cSources(env), ...manifest.cxxSources(env).filter(s => !appSensitive(s)),
   ...['web_display', 'web_platform', 'web_power', 'web_storage_service', 'web_camera'].map(n => `${root}/targets/web/main/${n}.cpp`),
   `${root}/test/wpt/bridge.cpp`];
 for (const source of sources) fs.accessSync(source);
@@ -43,5 +46,5 @@ for (let i = 0; i < sources.length; i++) {
 }
 fs.writeFileSync(stamp, identity);
 run(compiler, ['-O1', ...objects, '--no-entry', '-sALLOW_MEMORY_GROWTH=1', '-sMODULARIZE=1', '-sEXPORT_ES6=1', '-sENVIRONMENT=node', '-sEXPORTED_FUNCTIONS=["_malloc","_free"]', '-sEXPORTED_RUNTIME_METHODS=["ccall","HEAPU8"]', '-o', `${out}/wpt-renderer.mjs`]);
-fs.writeFileSync(`${out}/wpt-build.json`, JSON.stringify({ packages: Object.fromEntries(Object.entries(env).filter(([k]) => ['GEA_CORE', 'GEA_HOST_DIR', 'GEA_ENGINE_DIR', 'GEA_ELEMENTS_DIR', 'GEA_GEAOS_PACKAGE_DIR'].includes(k))), compiler: run(compiler, ['--version'], true), flags, profile: 'simulator RGB565, CSS DPR 1, static HTML subset with pinned fonts and ASCII/degree text' }, null, 2));
+fs.writeFileSync(`${out}/wpt-build.json`, JSON.stringify({ packages: Object.fromEntries(Object.entries(env).filter(([k]) => ['GEA_CORE', 'GEA_HOST_DIR', 'GEA_ENGINE_DIR', 'GEA_ELEMENTS_DIR', 'GEA_GEAOS_PACKAGE_DIR'].includes(k))), compiler: run(compiler, ['--version'], true), flags, profile: 'simulator RGB565, CSS DPR 1, static HTML subset with pinned fonts and ASCII/degree/ellipsis text' }, null, 2));
 console.log('Built dist/wpt-renderer.mjs using simulator display and shared framework sources.');
