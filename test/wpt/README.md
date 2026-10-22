@@ -2738,3 +2738,34 @@ with no regressions: `align-items-static-position-001`, `line-clamp-015` and
 `individual-transform-3` pass. `block-justify-self` goes from 21600 to 2400
 differing pixels; its last red row is an absolutely positioned 100px box whose
 "absolute parent" wraps to two lines in the rig's font and to one in Chrome's.
+
+## Replaced-box sizing, stretch, grid baselines, background shorthands (2026-10-22)
+
+Four shared-engine changes:
+
+- A flex item that is an image takes its min-content size as its content
+  size suggestion (CSS Flexbox 4.5): its natural size in the main axis, or
+  the size a definite cross size transfers through its ratio. An image's
+  `width: min-content`, `max-content` or `fit-content` with a definite height
+  is the transferred width (CSS Sizing 4, 5.2.1); the natural width no longer
+  overrides what the pass measured. A replaced box displayed as a block is a
+  block-level box of its container: its margins collapse with its siblings'
+  and `margin-trim` reaches them (CSS 2.2 9.2.1, 8.3.1).
+- `width: stretch` and `height: stretch` (CSS Sizing 4, 5.1.1): an absolutely
+  positioned box fills its inset-modified containing block, as it does with
+  both insets set; a block child fills a definite container height less its
+  margins.
+- Grid items aligned by first baseline that start in the same row share the
+  row's baseline (CSS Align 3, 9.1); each sits lower by its shim, which also
+  grows an auto row. Before, baseline fell back to start.
+- The `background` shorthand sets the placement longhands its layers carry
+  (position, size, repeat, attachment, origin); before, `url(x) no-repeat
+  center` tiled from the padding corner. An image tile covering the whole
+  painting area of a box with rounded corners is cut to them.
+
+The complete forced run moves from **950 PASS, 150 FAIL** to **960 PASS, 140 FAIL**
+with no regressions: `flex-aspect-ratio-055`, `intrinsic-size-017`, `-018` and
+`-019`, margin-trim's `block-container-replaced-block`, `-block-start` and
+`-block-end`, `abspos-stretch-replaced-percentage-child`,
+`grid-align-baseline-explicit-placement` and
+`background-image-centered-with-border-radius` pass.
