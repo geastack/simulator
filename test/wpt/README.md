@@ -2690,3 +2690,27 @@ collapsed border conflict resolution, column and column group backgrounds and
 borders, baseline alignment in cells, distributing a table's extra height over
 its rows, `overflow` other than `hidden` on tables, and placing a table beside
 floats by its minimum width.
+
+## Floats beside formatting contexts (2026-10-22)
+
+Five placements in the shared engine's float context now follow browsers:
+
+- A block formatting context that settles the hypothetical top of a wrapper
+  (its margin collapses through empty siblings into the wrapper's top, CSS 2.2
+  8.3.1) is first tried before its own margin, with the floats placed at that
+  top beside it. When they push it down, its margin is dropped like clearance
+  and the wrapper keeps the top without it; when it fits there, the margin
+  adjoins as before. This is LayoutNG's rule, checked in Chrome.
+- A float whose margin box has no area excludes nothing from a formatting
+  context, and beside a float a negative inline margin counts as zero.
+- A table with an automatic width shrinks to fit the opportunity beside floats.
+- A float inside a decorated inline box (padding, border or margin) is hoisted
+  to the enclosing block's float context; the inline box flows its other
+  content.
+- Floats beside an inline run add their width to the block's max-content size.
+
+The complete forced run moves from **940 PASS, 160 FAIL** to **947 PASS, 153 FAIL**
+with no regressions: `float-in-inline-001` and `-002`,
+`intrinsic-size-float-and-line`, `new-fc-separates-from-float` and `-2`,
+`table-sizing-with-adjacent-floats` and `zero-width-floats` pass.
+`new-fc-relayout` still fails: `line-height: 0` is stored as `normal`.
