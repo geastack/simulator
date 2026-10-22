@@ -2769,3 +2769,20 @@ with no regressions: `flex-aspect-ratio-055`, `intrinsic-size-017`, `-018` and
 `-block-end`, `abspos-stretch-replaced-percentage-child`,
 `grid-align-baseline-explicit-placement` and
 `background-image-centered-with-border-radius` pass.
+
+## Hidden back faces as containing blocks (2026-10-22)
+
+One shared-engine change: a box with `backface-visibility: hidden` whose
+parent preserves 3D is a containing block for its positioned descendants and
+a stacking context, as browsers make it. The complete forced run moves from
+**960 PASS, 140 FAIL** to **961 PASS, 139 FAIL** with no regressions:
+`backface-visibility-hidden-003` passes.
+
+Of the other four cheap-looking failures, none is a few lines:
+`block-ellipsis-039` and `line-clamp-auto-041` share one cause, the line the
+ellipsis empties keeps the height of the inline boxes it removed, which needs
+the clamp walk to measure the ellipsis and lay the line out again;
+`grid-trim-ignores-collapsed-tracks` needs `repeat(auto-fit, …)` tracks that
+collapse when empty; `3d-rendering-context-and-inline` needs flattening at
+every `transform-style: flat` ancestor in the projection chain, which the
+engine does not do for any ancestor.
