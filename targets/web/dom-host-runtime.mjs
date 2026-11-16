@@ -103,8 +103,49 @@ export function installImageData565(contextType = globalThis.CanvasRenderingCont
   })
 }
 
+// `ctx.panelBufferCount()` / `createPanelImageData565(i)` / `acquirePanelBuffer()`:
+// on a board with swap buffers an app renders straight into them. A browser
+// canvas has none to lend, so it reports none and the app keeps its own frame.
+export function installPanelBuffers(contextType = globalThis.CanvasRenderingContext2D) {
+  if (!contextType) return
+  const methods = {
+    panelBufferCount() {
+      return 0
+    },
+    createPanelImageData565() {
+      return { width: 0, height: 0, data16: new Uint16Array(0) }
+    },
+    acquirePanelBuffer() {
+      return -1
+    }
+  }
+  for (const [name, value] of Object.entries(methods)) {
+    if (typeof contextType.prototype[name] !== 'function') {
+      Object.defineProperty(contextType.prototype, name, { configurable: true, writable: true, value })
+    }
+  }
+}
+
+// `ctx.measureTextInkCenter(text)`: the offset from fillText's y anchor to the
+// vertical centre of the text's ink. The browser measures the ink box from the
+// context's own baseline, so the same subtraction centres the ink here as on a
+// board, whose fillText anchors the top of the line box.
+export function installInkCenter(contextType = globalThis.CanvasRenderingContext2D) {
+  if (!contextType || typeof contextType.prototype.measureTextInkCenter === 'function') return
+  Object.defineProperty(contextType.prototype, 'measureTextInkCenter', {
+    configurable: true,
+    writable: true,
+    value(text) {
+      const metrics = this.measureText(String(text))
+      return (metrics.actualBoundingBoxDescent - metrics.actualBoundingBoxAscent) / 2
+    }
+  })
+}
+
 installCanvasBatchMethods()
 installImageData565()
+installPanelBuffers()
+installInkCenter()
 
 // The application declarations support both imported and global job functions.
 Object.assign(globalThis, { fetchAsync, fetchReady, fetchResult, fetchRelease })

@@ -846,6 +846,27 @@ export const HOST_SHIM = `;(function () {
       level: function () { return 87 }
     }
   }
+  if (typeof window.__gea_Simd === 'undefined') {
+    // The board's vector kernels, as the exact scalar loops they must match.
+    window.__gea_Simd = {
+      sumWindowsU8: function (dst, dstStart, dstStride, src, offsets, windows, srcStride, width, rows, multiplier, shift) {
+        if (windows <= 0 || windows > 8 || windows > offsets.length || width <= 0 || rows <= 0) return
+        if (dstStart + (rows - 1) * dstStride + width > dst.length) return
+        for (var k = 0; k < windows; k++) {
+          if (offsets[k] < 0 || offsets[k] + (rows - 1) * srcStride + width > src.length) return
+        }
+        for (var r = 0; r < rows; r++) {
+          var out = dstStart + r * dstStride
+          for (var x = 0; x < width; x++) {
+            var sum = 0
+            for (var w = 0; w < windows; w++) sum += src[offsets[w] + r * srcStride + x]
+            var value = (sum * multiplier) >> shift
+            dst[out + x] = value < 255 ? value : 255
+          }
+        }
+      }
+    }
+  }
   if (typeof window.__gea_Memory === 'undefined') {
     window.__gea_Memory = {
       internalFree: function () { return 0 },
@@ -854,7 +875,10 @@ export const HOST_SHIM = `;(function () {
       psramFree: function () { return 0 },
       currentTaskStackHighWaterMark: function () { return 0 },
       geaMainStackBytes: function () { return 0 },
-      geaInitStackBytes: function () { return 0 }
+      geaInitStackBytes: function () { return 0 },
+      // One kind of memory in a browser: nothing to prefer.
+      beginInternal: noop,
+      endInternal: noop
     }
   }
   if (typeof window.__gea_audioContext === 'undefined') {
