@@ -1,8 +1,9 @@
 {
   "name": "@geastack/simulator",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "DOM emulator and web development with HMR for GeaStack apps, plus an optional WebAssembly device renderer.",
   "license": "Apache-2.0",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/geastack/simulator.git"

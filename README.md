@@ -10,20 +10,34 @@ and the CLI.
 
 | Path | Purpose |
 | --- | --- |
-| `simulator` | Vite app for the browser simulator. |
+| `simulator` | Vite app for the browser WASM simulator (its npm scripts live in the repository root `package.json`). |
 | `simulator/src` | App loader, manifest parsing, runtime mirror, framebuffer, parity tests, and UI shell. |
 | `targets/web` | Build and development scripts for the web target. |
 | `docs` | Architecture and development notes. |
 
 ## Quick Start
 
-Run the simulator app:
+The npm scripts below run from the repository root (the directory holding
+`package.json`), not from the `simulator/` subfolder, which holds only the Vite
+app.
+
+The WASM simulator shell renders each app from a module compiled by
+`targets/web/build-web.sh`. That script needs the Emscripten SDK (`emcc` and
+`em++` on `PATH`) and the build configuration the `gea` CLI resolves from the
+app manifest, so run it through the CLI, from an app folder (an app in the
+[examples](https://github.com/geastack/examples) repo, after `npm install`
+at that repo's root):
 
 ```sh
-cd simulator
 npm install
-npm run dev
+cd <examples checkout>/apps/watch
+GEA_SIMULATOR_DIR=<simulator checkout> npx gea simulate --renderer wasm
 ```
+
+This builds the app with this checkout's scripts, writes the module under the
+app's `.gea/build/web/`, and starts this checkout's simulator shell on it.
+Run it again after changing app or runtime sources. Running `build-web.sh`
+directly stops with "Missing native build configuration".
 
 Build and preview:
 
@@ -50,12 +64,17 @@ npm run test:browser
 Browser tests use the `*.browser.test.mjs` suffix and are excluded from
 `npm test` and `npm run test:targets`.
 
-Run a specific example through the web target:
+Run a specific example through the DOM web target with this checkout's
+scripts, from the app's folder:
 
 ```sh
-targets/web/dev-web.mjs watch
-targets/web/build-dom-web.mjs watch
+GEA_SIMULATOR_DIR=<simulator checkout> npx gea dev
+GEA_SIMULATOR_DIR=<simulator checkout> npx gea build --target web
 ```
+
+Those dispatch to `node targets/web/dev-web.mjs --app-dir <app dir>` and
+`node targets/web/build-dom-web.mjs --app-dir <app dir> --out-dir <app dir>/.gea/build/web/site`,
+which can also be run directly.
 
 ## Documentation
 
@@ -73,7 +92,9 @@ targets/web/build-dom-web.mjs watch
 
 - Keep simulator behavior close to target behavior. Parity tests exist to catch
   drift in app loading, framebuffer, RTC, media, fetch, and WebSocket behavior.
-- Keep generated app output under `targets/web/generated` disposable.
+- Keep generated app output disposable: `build-web.sh` run directly writes to
+  `targets/web/generated`, `targets/web/dist` and `simulator/public/apps`; the
+  `gea` CLI points the same script at the app's `.gea/build/web/` instead.
 - When adding a new app manifest feature, update simulator parsing and the
   examples/core manifest tests together.
 
@@ -97,9 +118,10 @@ gea simulate --renderer wasm    # embedded C++ renderer; requires Emscripten
 gea build --target web          # .gea/build/web/site
 ```
 
-`simulate` now defaults to DOM. Scripts that require framebuffer parity must
-explicitly pass `--renderer wasm`. The WASM shell (`npm run dev` in this repo)
-remains available; it does not provide the DOM app's component HMR.
+`simulate` defaults to DOM. Scripts that require framebuffer parity must
+explicitly pass `--renderer wasm`. The WASM shell (`npm run dev` in this repo,
+after building an app module as in [Quick Start](#quick-start)) does not
+provide the DOM app's component HMR.
 
 The DOM emulator uses the same development pipeline as `gea dev`. Its iframe
 contains real Gea DOM elements, browser CSS, and native pointer/keyboard input.
@@ -160,14 +182,16 @@ a device; browser layout is the browser's own layout implementation.
 
 ### Testing local compiler/runtime changes
 
-The installed dependency artifacts can differ from sibling source checkouts.
-Build the plugin and explicitly select both local packages when validating a
-cross-repository change (paths below assume sibling repositories):
+The installed dependency artifacts can differ from source checkouts. The DOM
+pipeline compiles JSX with `@geajs/vite-plugin` and runs on `@geajs/core`, both
+published from the Gea framework repository (packages `packages/vite-plugin-gea`
+and `packages/gea` there). Build the plugin in that checkout and explicitly
+select both local packages when validating a cross-repository change:
 
 ```sh
-npm --prefix ../gea run build:vite-plugin
-GEA_WEB_PLUGIN_DIR="$PWD/../gea/packages/vite-plugin-gea" \
-GEA_WEB_RUNTIME_DIR="$PWD/../gea/packages/gea" npm run test:browser
+npm --prefix <gea checkout> run build:vite-plugin
+GEA_WEB_PLUGIN_DIR="<gea checkout>/packages/vite-plugin-gea" \
+GEA_WEB_RUNTIME_DIR="<gea checkout>/packages/gea" npm run test:browser
 ```
 
 The same environment variables work with `gea dev`, `gea simulate`, and web

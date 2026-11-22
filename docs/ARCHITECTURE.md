@@ -46,21 +46,35 @@ When adding a manifest field:
 
 ## Development Loop
 
-For simulator UI/runtime work:
+For simulator UI/runtime work, from the repository root (the npm scripts live
+in the root `package.json`, not in `simulator/`):
 
 ```sh
-cd simulator
-npm run dev
-npm test
+npm install
 npm run check
+npm test
 ```
 
-For target-script work:
+To see an app in the WASM shell, run the CLI from that app's folder with this
+checkout selected; it builds the module with `build-web.sh` and starts the
+shell:
 
 ```sh
-targets/web/dev-web.mjs <app-id>
-targets/web/build-dom-web.mjs <app-id>
+GEA_SIMULATOR_DIR=<simulator checkout> npx gea simulate --renderer wasm
 ```
+
+For target-script work, run the DOM scripts from the app's folder, through the
+CLI or directly:
+
+```sh
+GEA_SIMULATOR_DIR=<simulator checkout> npx gea dev
+GEA_SIMULATOR_DIR=<simulator checkout> npx gea build --target web
+node <simulator checkout>/targets/web/dev-web.mjs --app-dir "$PWD"
+node <simulator checkout>/targets/web/build-dom-web.mjs --app-dir "$PWD"
+```
+
+`build-web.sh` has no direct form: it reads the build configuration that
+`gea simulate --renderer wasm` resolves from the app manifest.
 
 Use a small representative app such as `watch`, then a heavier rendering app
 such as `css-3d-cube`, `maps`, or `bouncing-balls-jsx` when runtime behavior
