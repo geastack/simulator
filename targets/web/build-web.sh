@@ -176,6 +176,17 @@ mkdir -p "$GEA_WEB_GENERATED_ROOT"
 # (engine ui/ sources + includes now come from the shared manifest gea_sources.sh)
 BUILD_DIR="$GENERATED_DIR/.obj"
 
+# A target profile builds a variant of this target from the same pipeline: the
+# sourced file may replace the main sources and exported functions, and add
+# compile defines, generator arguments and link options.
+WEB_TARGET_SOURCES=("$ROOT_DIR/targets/web/main/web_main.cpp" "$ROOT_DIR/targets/web/main/web_display.cpp")
+WEB_TARGET_EXPORTED_FUNCTIONS='["_app_init","_app_frame","_app_dispatch_key_down","_app_dispatch_pointer_event","_app_dispatch_pointer_event2","_app_hit_test","_app_touch_down","_app_touch_up","_app_touch_move","_get_framebuffer_ptr","_get_framebuffer_width","_get_framebuffer_height","_get_framebuffer_stride_bytes","_gea_web_media_inject_pcm","_malloc","_free"]'
+WEB_TARGET_DEFINES=(); WEB_TARGET_GENERATOR_ARGS=(); WEB_TARGET_LINK_OPTIONS=()
+if [[ -n "${GEA_WEB_TARGET_PROFILE:-}" ]]; then
+  # shellcheck source=/dev/null
+  source "$GEA_WEB_TARGET_PROFILE"
+fi
+
 echo "Building web app '$APP_ID'..."
 
 # TSX -> JS (vite-plugin-gea) -> C++ (geatsc), mirroring the esp32 flags so the
@@ -209,6 +220,7 @@ generate_one() {
     --cpp-board "$CPP_BOARD" \
     --font-device-pixel-ratio "$DEVICE_PIXEL_RATIO" \
     --gea-ir-backend \
+    "${WEB_TARGET_GENERATOR_ARGS[@]+"${WEB_TARGET_GENERATOR_ARGS[@]}"}" \
     "${extra[@]+"${extra[@]}"}"
 }
 
@@ -290,6 +302,7 @@ APP_CXX_INCLUDES=()
 CXX_DEFINES=(
   -DGEA_EMBEDDED_ENABLE_VIRTUAL_KEYBOARD=0
   -DGEA_EMBEDDED_HAS_GENERATED_FONTS=1
+  "${WEB_TARGET_DEFINES[@]+"${WEB_TARGET_DEFINES[@]}"}"
 )
 while IFS= read -r define; do
   [[ -n "$define" ]] && CXX_DEFINES+=("-D$define")
@@ -315,8 +328,7 @@ add_fw_cxx()  { local s; for s in "$@"; do CXX_SOURCES+=("$s"); CXX_SCOPE+=(fw);
 add_app_cxx() { local s; for s in "$@"; do CXX_SOURCES+=("$s"); CXX_SCOPE+=(app); done; }
 
 add_fw_cxx \
-  "$ROOT_DIR/targets/web/main/web_main.cpp" \
-  "$ROOT_DIR/targets/web/main/web_display.cpp" \
+  "${WEB_TARGET_SOURCES[@]}" \
   "$ROOT_DIR/targets/web/main/web_platform.cpp" \
   "$ROOT_DIR/targets/web/main/web_power.cpp" \
   "$ROOT_DIR/targets/web/main/web_storage_service.cpp" \
@@ -789,7 +801,7 @@ echo "  objects: $COMPILED compiled, $REUSED reused${SHARED_OBJ_DIR:+ (framework
 # The app's own entry points join this list rather than replacing it; an app
 # link option can still override any -s above it, because emcc takes the last
 # spelling of a setting.
-EXPORTED_FUNCTIONS='["_app_init","_app_frame","_app_dispatch_key_down","_app_dispatch_pointer_event","_app_dispatch_pointer_event2","_app_hit_test","_app_touch_down","_app_touch_up","_app_touch_move","_get_framebuffer_ptr","_get_framebuffer_width","_get_framebuffer_height","_get_framebuffer_stride_bytes","_gea_web_media_inject_pcm","_malloc","_free"]'
+EXPORTED_FUNCTIONS="$WEB_TARGET_EXPORTED_FUNCTIONS"
 if (( ${#APP_EXPORTED_FUNCTIONS[@]} > 0 )); then
   EXPORTED_FUNCTIONS="$(node -e '
     const base = JSON.parse(process.argv[1])
@@ -809,6 +821,7 @@ em++ $OPT \
   -s EXPORT_ES6=1 \
   -s EXPORTED_FUNCTIONS="$EXPORTED_FUNCTIONS" \
   -s EXPORTED_RUNTIME_METHODS='["ccall","HEAPU8","HEAPU16"]' \
+  ${WEB_TARGET_LINK_OPTIONS[@]+"${WEB_TARGET_LINK_OPTIONS[@]}"} \
   ${APP_LINK_OPTIONS[@]+"${APP_LINK_OPTIONS[@]}"}
 
 cp "$DIST_DIR/module.wasm" "$PUBLIC_DIR/module.wasm"

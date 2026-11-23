@@ -64,6 +64,9 @@ static void drive_css_animations(int timestamp_ms)
 // C-linkage definitions. The bodies still call into the C++ runtime/UI.
 extern "C" {
 
+// A target variant that presents the frame itself (web-skia) overrides this.
+__attribute__((weak)) void web_target_frame_end(void) {}
+
 EMSCRIPTEN_KEEPALIVE
 int app_init(int width, int height, double devicePixelRatio)
 {
@@ -87,6 +90,7 @@ void app_frame(int timestampMs)
 	drive_css_animations(timestampMs);
 	gea::framework::app::Application::frame(timestampMs);
 	gea::host::Storage.flushPending();
+	web_target_frame_end();
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -253,30 +257,6 @@ void app_dispatch_pointer_event2(int event_type, int press_id, int x, int y)
 		default:
 			break;
 	}
-}
-
-EMSCRIPTEN_KEEPALIVE
-const uint16_t *get_framebuffer_ptr(void)
-{
-	return web_display_pixels();
-}
-
-EMSCRIPTEN_KEEPALIVE
-int get_framebuffer_width(void)
-{
-	return web_display_width();
-}
-
-EMSCRIPTEN_KEEPALIVE
-int get_framebuffer_height(void)
-{
-	return web_display_height();
-}
-
-EMSCRIPTEN_KEEPALIVE
-int get_framebuffer_stride_bytes(void)
-{
-	return web_display_stride_bytes();
 }
 
 }  // extern "C"

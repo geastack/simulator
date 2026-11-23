@@ -31,7 +31,7 @@ DeviceInfo Camera::deviceAt(int /*index*/) { return DeviceInfo{}; }
 void Camera::drawPreview(int /*x*/, int /*y*/, int /*destW*/, int /*destH*/) {}
 
 int Camera::previewMode() { return 0; }  // Framebuffer
-bool Camera::fillPreview(std::uint16_t * /*dst*/, int /*dstWidth*/, int /*dstHeight*/, int /*fit*/, bool /*mirror*/) { return false; }
+bool Camera::fillPreview(gea::framework::graphics::pixel::native_t * /*dst*/, int /*dstWidth*/, int /*dstHeight*/, int /*fit*/, bool /*mirror*/) { return false; }
 
 void Camera::positionPreviewLayer(int /*x*/, int /*y*/, int /*width*/, int /*height*/) {}
 void Camera::hidePreviewLayer() {}

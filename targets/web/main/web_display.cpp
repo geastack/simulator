@@ -18,6 +18,8 @@
 #include "canvas.h"
 #include "display_present.h"
 
+#include <emscripten/emscripten.h>
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -56,6 +58,30 @@ const uint16_t *web_display_pixels(void) { return g_canvas.pixels(); }
 int web_display_width(void) { return g_canvas.width(); }
 int web_display_height(void) { return g_canvas.height(); }
 int web_display_stride_bytes(void) { return g_canvas.strideBytes(); }
+
+EMSCRIPTEN_KEEPALIVE
+const uint16_t *get_framebuffer_ptr(void)
+{
+	return web_display_pixels();
+}
+
+EMSCRIPTEN_KEEPALIVE
+int get_framebuffer_width(void)
+{
+	return web_display_width();
+}
+
+EMSCRIPTEN_KEEPALIVE
+int get_framebuffer_height(void)
+{
+	return web_display_height();
+}
+
+EMSCRIPTEN_KEEPALIVE
+int get_framebuffer_stride_bytes(void)
+{
+	return web_display_stride_bytes();
+}
 
 }  // extern "C"
 
