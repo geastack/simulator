@@ -4,7 +4,8 @@
 // It runs the web target's build-web.sh with the web-skia profile, then writes
 // the TTFs the engine measured text with (extracted from the generated font
 // unit, so they are byte-identical) next to module.wasm, named as the list's
-// font table names them.
+// font table names them. An app.json beside the app's package.json is copied
+// into the bundle as is; the target does not interpret it.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -64,6 +65,9 @@ for (const font of runtimeFonts(path.join(generatedRoot, app.id, 'gea_embedded_f
   fs.writeFileSync(path.join(bundleDir, `${font.family}.ttf`), font.data)
   console.log(`  font: ${font.family}.ttf (${font.data.length} bytes)`)
 }
+const appJson = path.join(app.root, 'app.json')
+if (fs.existsSync(appJson)) fs.copyFileSync(appJson, path.join(bundleDir, 'app.json'))
+else fs.rmSync(path.join(bundleDir, 'app.json'), { force: true })
 console.log(`Done: ${app.id} web-skia bundle -> ${bundleDir}`)
 
 function runtimeFonts(file) {
