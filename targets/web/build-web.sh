@@ -72,10 +72,10 @@ fi
 GEA_CLI="${GEA_CLI_BIN:-$(resolve_package_dir @geastack/cli)/bin/gea.mjs}"
 [[ -f "$GEA_CLI" ]] || { echo "Cannot resolve @geastack/cli; set GEA_CLI_BIN" >&2; exit 1; }
 
-# ESP32 board profile this simulator mirrors (see
-# targets/esp32-s3-touch-amoled-2.06/main/CMakeLists.txt). Override via env to
-# mirror a different board, e.g. the p4 7" panel:
-#   GEA_WEB_CPP_BOARD=esp32-p4-waveshare-touch-lcd-7
+# The board profile selects the C++ ABI. Set GEA_WEB_FONT_VIEWPORT_WIDTH
+# and GEA_WEB_FONT_VIEWPORT_HEIGHT to the preview viewport when it differs
+# from the simulator's default 410x502.
+CPP_BOARD=esp32-p4-waveshare-touch-lcd-7
 # Pixel ratio is gea.targets.web.cssDevicePixelRatio in package.json.
 CPP_BOARD="${GEA_WEB_CPP_BOARD:-esp32-s3-touch-amoled-2.06}"
 # GEA_COMPILER_RUNTIME_SOURCE, when non-empty, aliases @geajs/core to that file.
@@ -218,6 +218,8 @@ generate_one() {
     --entry "$entry" \
     --out-dir "$out_dir" \
     --cpp-board "$CPP_BOARD" \
+    --font-viewport-width "${GEA_WEB_FONT_VIEWPORT_WIDTH:-410}" \
+    --font-viewport-height "${GEA_WEB_FONT_VIEWPORT_HEIGHT:-502}" \
     --font-device-pixel-ratio "$DEVICE_PIXEL_RATIO" \
     --gea-ir-backend \
     "${WEB_TARGET_GENERATOR_ARGS[@]+"${WEB_TARGET_GENERATOR_ARGS[@]}"}" \
