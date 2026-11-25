@@ -126,10 +126,14 @@ const emulate = !!args.flags['--emulator']
 // module evaluates host.ts.
 const harnessPlugin = {
   name: 'gea-web-dev-harness',
-  transformIndexHtml() {
-    return [{ tag: 'script', injectTo: 'head-prepend', children: HOST_SHIM + (emulate ? `
+  transformIndexHtml(_html, { originalUrl, path }) {
+    const tags = [{ tag: 'script', injectTo: 'head-prepend', children: HOST_SHIM + (emulate ? `
       window.__geaTargetScale = Number(new URLSearchParams(location.search).get('__gea_emulator_dpr')) || 1;
     ` : '') }]
+    if (emulate && new URL(originalUrl ?? path, 'http://localhost').searchParams.has('__gea_emulator_dpr')) {
+      tags.push({ tag: 'style', injectTo: 'head-prepend', children: ':where(body) { margin: 0; }' })
+    }
+    return tags
   },
   configureServer(server) {
     // PRE middleware. The device-file URLs (/sdcard/...) and the manifest are
