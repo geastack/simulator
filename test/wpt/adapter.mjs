@@ -3,7 +3,7 @@ import { parse } from 'parse5';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { normalizeNamedColors } from './named-colors.mjs';
-import { defaultFont, ahemFont } from './fonts.mjs';
+import { defaultFont, ahemFont, monospaceFont } from './fonts.mjs';
 
 export class Unsupported extends Error {}
 
@@ -48,24 +48,75 @@ export function localReference(from, href) {
 
 // This transport adapter normalizes named colors to equivalent RGB hex values.
 // Layout decisions and style resolution remain in Gea; upstream files stay intact.
-export function parseDocument(source, name, { readResource } = {}) {
-  if (!name.endsWith('.html')) throw new Unsupported('Only HTML documents are supported; XHTML needs an XML adapter');
+// `force` renders past every guard instead of skipping: each guard records its
+// reason in `forced`, and the construct is transported as-is, or dropped when it
+// cannot be (an unloadable font or stylesheet, an at-rule, an attribute). A forced
+// result is not conformance evidence: test and reference can share the defect.
+export function parseDocument(source, name, { readResource, force = false } = {}) {
+  const forced = [];
+  function unsupported(reason) {
+    if (!force) throw new Unsupported(reason);
+    if (!forced.includes(reason)) forced.push(reason);
+  }
+  // Drops one construct in force mode when a guard inside it throws.
+  function guarded(transport) {
+    try {
+      transport();
+    } catch (error) {
+      if (!force || !(error instanceof Unsupported)) throw error;
+      unsupported(error.message);
+    }
+  }
+  if (!name.endsWith('.html')) unsupported('Only HTML documents are supported; XHTML needs an XML adapter');
   const dom = parse(source);
-  if (dom.mode !== 'no-quirks') throw new Unsupported('Quirks-mode document');
-  const rules = [], references = [], specs = [], normalizations = [], fonts = [], properties = new Set();
-  let title = name, fuzzy = null, count = 0;
-  function declarations(nodes) {
-    return nodes.filter(n => n.type !== 'comment').map(n => {
-      if (n.type !== 'decl') throw new Unsupported('Nested CSS or at-rule');
-      if (/url\s*\(/i.test(n.value)) throw new Unsupported('CSS resource/font loading');
-      if (n.important) throw new Unsupported('!important needs priority-preserving declaration transport');
-      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none)$/i.test(n.value)) throw new Unsupported('Only block/flex/grid/none display declarations are supported by this adapter');
-      if (n.prop.toLowerCase() === 'content') throw new Unsupported('Generated text content');
-      if (/^(animation|transition)(-|$)/i.test(n.prop)) throw new Unsupported('Animation/transition timing is not implemented by this static adapter');
+  if (dom.mode !== 'no-quirks') unsupported('Quirks-mode document');
+  const rules = [], references = [], specs = [], normalizations = [], fonts = [], images = [], properties = new Set();
+  let title = name, fuzzy = null, count = 0, monospace = false;
+  // A pinned image by its path from the WPT root: the name Gea's asset lookup
+  // receives from url() and src.
+  function image(from, href) {
+    const path = localReference(from, href);
+    if (!/\.(png|jpe?g|gif)$/i.test(path)) throw new Unsupported(`Unsupported image format: ${href}`);
+    if (!images.includes(path)) images.push(path);
+    return path;
+  }
+  // Background layers name their images with url(); each becomes the pinned
+  // path. Any other url() (fonts aside, see fontFace) stays unsupported.
+  function backgroundImages(property, value, from) {
+    if (!/url\s*\(/i.test(value)) return value;
+    if (!/^background(-image)?$/i.test(property)) throw new Unsupported('CSS resource/font loading');
+    const parsed = valueParser(value);
+    parsed.walk(node => {
+      if (node.type !== 'function' || node.value.toLowerCase() !== 'url') return;
+      const href = node.nodes.filter(n => n.type !== 'space');
+      if (href.length !== 1 || !['word', 'string'].includes(href[0].type) || /\\/.test(href[0].value)) throw new Unsupported('Unsupported image URL');
+      node.nodes = [{ type: 'string', quote: '"', value: image(from, href[0].value) }];
+      return false;
+    });
+    return valueParser.stringify(parsed.nodes);
+  }
+  function declarations(nodes, from = name) {
+    return nodes.filter(n => n.type !== 'comment').flatMap(n => {
+      if (n.type !== 'decl') {
+        unsupported('Nested CSS or at-rule');
+        return [];
+      }
+      let resolved = n.value;
+      try {
+        resolved = backgroundImages(n.prop, n.value, from);
+      } catch (error) {
+        if (!(error instanceof Unsupported)) throw error;
+        unsupported(error.message);
+      }
+      if (n.important) unsupported('!important needs priority-preserving declaration transport');
+      if (n.prop.toLowerCase() === 'display' && !/^(block|flex|grid|none|flow-root|list-item|inline|inline-block|inline-flex|inline-grid|table|table-(row-group|header-group|footer-group|row|cell|caption|column|column-group))$/i.test(n.value)) unsupported('Only block/flex/grid/none/flow-root/list-item/inline/inline-block/inline-flex/inline-grid/table display declarations are supported by this adapter');
+      if (n.prop.toLowerCase() === 'content') unsupported('Generated text content');
+      if (/^(animation|transition)(-|$)/i.test(n.prop)) unsupported('Animation/transition timing is not implemented by this static adapter');
       properties.add(n.prop);
-      const value = normalizeNamedColors(n.prop, n.value);
-      if (value !== n.value) normalizations.push({ property: n.prop, from: n.value, to: value });
-      return [n.prop, value];
+      if (/^font(-family)?$/i.test(n.prop) && /\bmonospace\b/i.test(n.value)) monospace = true;
+      const value = normalizeNamedColors(n.prop, resolved);
+      if (value !== resolved) normalizations.push({ property: n.prop, from: resolved, to: value });
+      return [[n.prop, value]];
     });
   }
   function fontFace(node, from) {
@@ -105,47 +156,52 @@ export function parseDocument(source, name, { readResource } = {}) {
   function stylesheet(text, from = name) {
     for (const n of postcss.parse(text).nodes) {
       if (n.type === 'comment') continue;
-      if (n.type === 'atrule' && n.name.toLowerCase() === 'font-face') { fontFace(n, from); continue; }
-      if (n.type !== 'rule') throw new Unsupported(`CSS ${n.type}: ${n.name || ''}`);
-      const values = declarations(n.nodes);
+      if (n.type === 'atrule' && n.name.toLowerCase() === 'font-face') { guarded(() => fontFace(n, from)); continue; }
+      if (n.type !== 'rule') {
+        unsupported(`CSS ${n.type}: ${n.name || ''}`);
+        continue;
+      }
+      const values = declarations(n.nodes, from);
       for (const selector of postcss.list.comma(n.selector)) {
-        if (!/^(html|body)$/i.test(selector) && /(?:^|[\s>+~])(?:html|body)(?=[\s.#:[>+~]|$)/i.test(selector)) throw new Unsupported('Compound HTML/body selectors use native application-root aliases');
+        if (!/^(html|body)$/i.test(selector) && /(?:^|[\s>+~])(?:html|body)(?=[\s.#:[>+~]|$)/i.test(selector)) unsupported('Compound HTML/body selectors use native application-root aliases');
         rules.push({ selector, declarations: values });
       }
     }
   }
   function inspect(n) {
     const a = Object.fromEntries((n.attrs || []).map(a => [a.name, a.value]));
-    if (n.tagName === 'script') throw new Unsupported('JavaScript/testharness document');
-    if (n.tagName === 'base') throw new Unsupported('HTML base URL');
+    if (n.tagName === 'script') unsupported('JavaScript/testharness document');
+    if (n.tagName === 'base') unsupported('HTML base URL');
     if (n.tagName === 'style') {
-      if (a.media && a.media !== 'all') throw new Unsupported('Style media condition');
-      if (a.type && a.type.toLowerCase() !== 'text/css') throw new Unsupported(`Style MIME type ${a.type}`);
+      if (a.media && a.media !== 'all') unsupported('Style media condition');
+      if (a.type && a.type.toLowerCase() !== 'text/css') unsupported(`Style MIME type ${a.type}`);
       stylesheet(n.childNodes.map(n => n.value || '').join(''));
     }
     if (n.tagName === 'title') title = n.childNodes.map(n => n.value || '').join('').trim();
     if (n.tagName === 'link') {
       if (['match', 'mismatch'].includes(a.rel)) references.push({ relation: a.rel, path: localReference(name, a.href) });
       if (a.rel === 'help') specs.push(a.href);
-      if (a.rel === 'stylesheet') {
+      if (a.rel === 'stylesheet') guarded(() => {
         if (!readResource) throw new Unsupported('External stylesheet loading');
-        if (a.media && a.media !== 'all') throw new Unsupported('Stylesheet media condition');
-        if (a.type && a.type.toLowerCase() !== 'text/css') throw new Unsupported(`Stylesheet MIME type ${a.type}`);
+        if (a.media && a.media !== 'all') unsupported('Stylesheet media condition');
+        if (a.type && a.type.toLowerCase() !== 'text/css') unsupported(`Stylesheet MIME type ${a.type}`);
         if (Object.hasOwn(a, 'disabled')) throw new Unsupported('Disabled stylesheet');
         // Resolve from the document URL and apply in document order. The caller
         // supplies only hash-verified vendored resources; no network during runs.
         const source = localReference(name, a.href);
         stylesheet(readResource(source), source);
-      }
+      });
     }
     if (n.tagName === 'meta' && a.name === 'fuzzy') {
-      if (fuzzy !== null) throw new Unsupported('Multiple/per-reference fuzzy metadata');
-      fuzzy = parseFuzzy(a.content);
+      if (fuzzy !== null) unsupported('Multiple/per-reference fuzzy metadata');
+      else guarded(() => { fuzzy = parseFuzzy(a.content); });
     }
-    if (n.tagName === 'meta' && ['viewport', 'flags'].includes(a.name) && a.content) throw new Unsupported(`Test metadata: ${a.name}=${a.content}`);
+    // flags=image only asks for image support, which the rig now provides.
+    if (n.tagName === 'meta' && ['viewport', 'flags'].includes(a.name) && a.content &&
+        !(a.name === 'flags' && a.content.trim().split(/\s+/).every(flag => flag === 'image'))) unsupported(`Test metadata: ${a.name}=${a.content}`);
     for (const [key, value] of Object.entries(a)) {
-      if (key.startsWith('on')) throw new Unsupported(`Event handler ${key}`);
-      if (key === 'class' && /(?:^|\s)(?:reftest-wait|test-wait)(?:\s|$)/.test(value)) throw new Unsupported('Script-controlled screenshot readiness');
+      if (key.startsWith('on')) unsupported(`Event handler ${key}`);
+      if (key === 'class' && /(?:^|\s)(?:reftest-wait|test-wait)(?:\s|$)/.test(value)) unsupported('Script-controlled screenshot readiness');
     }
     for (const child of n.childNodes || []) inspect(child);
   }
@@ -153,19 +209,22 @@ export function parseDocument(source, name, { readResource } = {}) {
   function element(n) {
     if (n.nodeName === '#comment') return null;
     if (n.nodeName === '#text') {
-      if (/[^\t\r\n\f\x20-\x7e\u00b0]/u.test(n.value)) throw new Unsupported('Text codepoint outside native runtime font repertoire');
-      if (++count > 450) throw new Unsupported('Document exceeds adapter node limit');
+      if (/[^\t\r\n\f\x20-\x7e\u00b0\u2026]/u.test(n.value)) unsupported('Text codepoint outside native runtime font repertoire');
+      if (++count > 450) unsupported('Document exceeds adapter node limit');
       return { tag: '#text', text: n.value, attributes: [], inline: [], children: [] };
     }
     if (n.tagName === 'head') return null;
-    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br'].includes(n.tagName)) throw new Unsupported(`HTML element <${n.tagName}>`);
-    if (n.namespaceURI !== 'http://www.w3.org/1999/xhtml') throw new Unsupported('Non-HTML namespace');
-    if (++count > 450) throw new Unsupported('Document exceeds adapter node limit');
+    // These never generate boxes; inspect() already applied what they carry.
+    if (force && ['script', 'style', 'template', 'title', 'meta', 'link', 'base', 'noscript'].includes(n.tagName)) return null;
+    if (!['html', 'body', 'div', 'span', 'section', 'p', 'br', 'strong', 'aside', 'article', 'img', 'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'col', 'colgroup', 'flexbox', 'grid', 'container', 'item'].includes(n.tagName)) unsupported(`HTML element <${n.tagName}>`);
+    if (n.namespaceURI !== 'http://www.w3.org/1999/xhtml') unsupported('Non-HTML namespace');
+    if (++count > 450) unsupported('Document exceeds adapter node limit');
     const attributes = [], inline = [];
     for (const a of n.attrs || []) {
       if (a.name === 'style') inline.push(...declarations(postcss.parse(a.value).nodes));
       else if (['id', 'class'].includes(a.name) || a.name.startsWith('data-')) attributes.push([a.name, a.value]);
-      else if (a.name !== 'xmlns') throw new Unsupported(`HTML attribute ${a.name}`);
+      else if (n.tagName === 'img' && a.name === 'src') guarded(() => attributes.push(['src', image(name, a.value)]));
+      else if (a.name !== 'xmlns') unsupported(`HTML attribute ${a.name}`);
     }
     const children = [];
     for (const child of (n.childNodes || []).map(element).filter(Boolean)) {
@@ -179,7 +238,8 @@ export function parseDocument(source, name, { readResource } = {}) {
   const tree = element(dom.childNodes.find(n => n.tagName === 'html'));
   if (!fonts.some(font => font.family.toLowerCase() === defaultFont.family)) fonts.unshift(defaultFont);
   if (!fonts.some(font => font.family.toLowerCase() === 'ahem')) fonts.push(ahemFont);
-  return { title, tree, rules, fonts, references, specs, fuzzy, normalizations, properties: [...properties].sort() };
+  if (monospace && !fonts.some(font => font.family.toLowerCase() === 'monospace')) fonts.push(monospaceFont);
+  return { title, tree, rules, fonts, images, references, specs, fuzzy, normalizations, properties: [...properties].sort(), forced };
 }
 
 export function parseFuzzy(value) {
